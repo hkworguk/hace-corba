@@ -1,0 +1,12 @@
+# CMake (C runtime)
+/build/
+
+# Cargo (Rust idlc, bindings, examples)
+target/
+
+# gnatmake (Ada95 bindings, examples, tests) build artifacts
+*.o
+*.ali
+*.a
+examples/ada95/cdr_udp_echo/cdr_udp_echo
+bindings/ada95/tests/test_hace_corba

@@ -1,0 +1,10 @@
+[package]
+name = "hace-corba"
+version = "0.1.0"
+edition = "2021"
+description = "Rust bindings for the hace-corba CDR/HAL runtime. Not part of the DAL C certification boundary — see docs/architecture/adr-0001-runtime-language.md."
+build = "build.rs"
+
+[lib]
+name = "hace_corba"
+path = "src/lib.rs"

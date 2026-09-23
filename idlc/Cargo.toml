@@ -1,0 +1,9 @@
+[package]
+name = "hace-idlc"
+version = "0.1.0"
+edition = "2021"
+description = "IDL compiler for hace-corba: generates Ada95, C, C++, and Rust bindings from OMG IDL."
+
+[[bin]]
+name = "hace-idlc"
+path = "src/main.rs"

@@ -1,0 +1,8 @@
+[package]
+name = "cdr_udp_echo"
+version = "0.1.0"
+edition = "2021"
+description = "Encodes a CDR message and round-trips it over a raw UDP HAL socket. Demonstrates the hace-corba Rust bindings as they stand today (CDR + HAL only -- there is no ORB/POA yet, so this is not an RPC example; see docs/roadmap.md)."
+
+[dependencies]
+hace-corba = { path = "../../../bindings/rust/hace-corba" }
