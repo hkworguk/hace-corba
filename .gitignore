@@ -10,3 +10,5 @@ target/
 *.a
 examples/ada95/cdr_udp_echo/cdr_udp_echo
 bindings/ada95/tests/test_hace_corba
+
+docs/roadmap.md

@@ -4,6 +4,12 @@ target_include_directories(test_cdr PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 add_test(NAME test_cdr COMMAND test_cdr)
 
+add_executable(test_giop test_giop.c)
+target_link_libraries(test_giop PRIVATE hace_corba_core)
+target_include_directories(test_giop PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+
+add_test(NAME test_giop COMMAND test_giop)
+
 if(HACE_TARGET_PLATFORM STREQUAL "linux")
     add_executable(test_hal test_hal.c)
     target_link_libraries(test_hal PRIVATE hace_corba_core)

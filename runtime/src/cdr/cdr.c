@@ -138,6 +138,39 @@ hace_cdr_status_t hace_cdr_buffer_set_position(hace_cdr_buffer_t *buf,
     return HACE_CDR_OK;
 }
 
+hace_cdr_status_t hace_cdr_buffer_set_byte_order(hace_cdr_buffer_t *buf,
+                                                  hace_cdr_byte_order_t order)
+{
+    if (buf == NULL) {
+        return HACE_CDR_ERR_INVALID_ARGUMENT;
+    }
+    if ((order != HACE_CDR_BIG_ENDIAN) && (order != HACE_CDR_LITTLE_ENDIAN)) {
+        return HACE_CDR_ERR_INVALID_ARGUMENT;
+    }
+    buf->byte_order = order;
+    return HACE_CDR_OK;
+}
+
+hace_cdr_status_t hace_cdr_buffer_init_view(hace_cdr_buffer_t *view,
+                                             hace_cdr_buffer_t *parent,
+                                             size_t length)
+{
+    if ((view == NULL) || (parent == NULL)) {
+        return HACE_CDR_ERR_INVALID_ARGUMENT;
+    }
+    if (length > (parent->capacity - parent->position)) {
+        return HACE_CDR_ERR_BUFFER_OVERFLOW;
+    }
+
+    view->data = &parent->data[parent->position];
+    view->capacity = length;
+    view->position = 0U;
+    view->byte_order = parent->byte_order;
+
+    parent->position += length;
+    return HACE_CDR_OK;
+}
+
 /* ---- Encode ---- */
 
 hace_cdr_status_t hace_cdr_encode_octet(hace_cdr_buffer_t *buf, uint8_t value)
@@ -289,4 +322,150 @@ hace_cdr_status_t hace_cdr_decode_f64(hace_cdr_buffer_t *buf, double *out)
         return HACE_CDR_ERR_INVALID_ARGUMENT;
     }
     return hace_cdr_decode_bytes(buf, (uint8_t *)out, sizeof(*out));
+}
+
+/* ---- Strings, sequences ---- */
+
+hace_cdr_status_t hace_cdr_encode_string(hace_cdr_buffer_t *buf,
+                                          const char *str, size_t max_length)
+{
+    size_t length;
+    hace_cdr_status_t status;
+
+    if ((buf == NULL) || (str == NULL)) {
+        return HACE_CDR_ERR_INVALID_ARGUMENT;
+    }
+    length = strlen(str);
+    if (length >= max_length) {
+        return HACE_CDR_ERR_INVALID_ARGUMENT;
+    }
+
+    /* length + 1 for the NUL terminator, which CDR strings always
+     * include on the wire. */
+    status = hace_cdr_encode_u32(buf, (uint32_t)(length + 1U));
+    if (status != HACE_CDR_OK) {
+        return status;
+    }
+
+    if ((buf->position + length + 1U) > buf->capacity) {
+        return HACE_CDR_ERR_BUFFER_OVERFLOW;
+    }
+    (void)memcpy(&buf->data[buf->position], str, length);
+    buf->data[buf->position + length] = 0U;
+    buf->position += length + 1U;
+    return HACE_CDR_OK;
+}
+
+hace_cdr_status_t hace_cdr_decode_string(hace_cdr_buffer_t *buf, char *out,
+                                          size_t out_capacity,
+                                          size_t *out_length)
+{
+    uint32_t wire_length;
+    hace_cdr_status_t status;
+
+    if ((buf == NULL) || (out == NULL) || (out_capacity == 0U)) {
+        return HACE_CDR_ERR_INVALID_ARGUMENT;
+    }
+
+    status = hace_cdr_decode_u32(buf, &wire_length);
+    if (status != HACE_CDR_OK) {
+        return status;
+    }
+    if ((wire_length == 0U) || ((size_t)wire_length > out_capacity)) {
+        return HACE_CDR_ERR_INVALID_ARGUMENT;
+    }
+    if ((buf->position + wire_length) > buf->capacity) {
+        return HACE_CDR_ERR_BUFFER_UNDERFLOW;
+    }
+
+    (void)memcpy(out, &buf->data[buf->position], wire_length);
+    buf->position += wire_length;
+
+    /* wire_length includes the NUL; report the length excluding it. */
+    if (out_length != NULL) {
+        *out_length = (size_t)wire_length - 1U;
+    }
+    return HACE_CDR_OK;
+}
+
+hace_cdr_status_t hace_cdr_encode_sequence_length(hace_cdr_buffer_t *buf,
+                                                   size_t count)
+{
+    return hace_cdr_encode_u32(buf, (uint32_t)count);
+}
+
+hace_cdr_status_t hace_cdr_decode_sequence_length(hace_cdr_buffer_t *buf,
+                                                   size_t max_count,
+                                                   size_t *out_count)
+{
+    uint32_t wire_count;
+    hace_cdr_status_t status;
+
+    if (out_count == NULL) {
+        return HACE_CDR_ERR_INVALID_ARGUMENT;
+    }
+
+    status = hace_cdr_decode_u32(buf, &wire_count);
+    if (status != HACE_CDR_OK) {
+        return status;
+    }
+    if ((size_t)wire_count > max_count) {
+        return HACE_CDR_ERR_INVALID_ARGUMENT;
+    }
+
+    *out_count = (size_t)wire_count;
+    return HACE_CDR_OK;
+}
+
+hace_cdr_status_t hace_cdr_encode_octet_seq(hace_cdr_buffer_t *buf,
+                                             const uint8_t *data,
+                                             size_t count)
+{
+    hace_cdr_status_t status;
+
+    if ((buf == NULL) || ((data == NULL) && (count > 0U))) {
+        return HACE_CDR_ERR_INVALID_ARGUMENT;
+    }
+
+    status = hace_cdr_encode_sequence_length(buf, count);
+    if (status != HACE_CDR_OK) {
+        return status;
+    }
+    if ((buf->position + count) > buf->capacity) {
+        return HACE_CDR_ERR_BUFFER_OVERFLOW;
+    }
+    if (count > 0U) {
+        (void)memcpy(&buf->data[buf->position], data, count);
+    }
+    buf->position += count;
+    return HACE_CDR_OK;
+}
+
+hace_cdr_status_t hace_cdr_decode_octet_seq(hace_cdr_buffer_t *buf,
+                                             uint8_t *out, size_t max_count,
+                                             size_t *out_count)
+{
+    size_t count;
+    hace_cdr_status_t status;
+
+    if ((buf == NULL) || ((out == NULL) && (max_count > 0U))) {
+        return HACE_CDR_ERR_INVALID_ARGUMENT;
+    }
+
+    status = hace_cdr_decode_sequence_length(buf, max_count, &count);
+    if (status != HACE_CDR_OK) {
+        return status;
+    }
+    if ((buf->position + count) > buf->capacity) {
+        return HACE_CDR_ERR_BUFFER_UNDERFLOW;
+    }
+    if (count > 0U) {
+        (void)memcpy(out, &buf->data[buf->position], count);
+    }
+    buf->position += count;
+
+    if (out_count != NULL) {
+        *out_count = count;
+    }
+    return HACE_CDR_OK;
 }
