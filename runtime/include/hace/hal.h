@@ -11,7 +11,9 @@
  * Backends: runtime/src/hal/linux/ (Ubuntu, POSIX) and
  * runtime/src/hal/integrity178/ (Green Hills INTEGRITY-178 tuMP, stub
  * pending access to the licensed Green Hills SDK — see that directory's
- * README).
+ * README). This header itself is platform-neutral (the interface, not
+ * an implementation), so it lives in the public include/ tree alongside
+ * cdr.h/giop.h/uiop.h rather than under src/.
  */
 #ifndef HACE_HAL_H
 #define HACE_HAL_H

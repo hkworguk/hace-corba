@@ -50,26 +50,41 @@ Everything else below is planned, not yet built.
   part of the DAL C certification boundary (see
   `docs/architecture/adr-0001-runtime-language.md`).
 
-## Phase 2 — UIOP transport
-- UDP datagram framing for the GIOP messages Phase 1 now encodes/decodes,
-  max-datagram-size configuration.
-- Twoway call semantics: request-id, bounded retry/timeout (statically
-  configured per operation).
-- Oneway semantics: fire-and-forget, no retry (document as a profile
-  deviation from IIOP's reliable-transport-backed oneway).
-- Fragmentation in practice: splitting a message that doesn't fit one
-  datagram across a bounded number of Fragment messages, and
-  reassembling them on receipt — Phase 1 only built the Fragment
-  message's own header format, not this orchestration.
-- Fault-injection loopback transport for testing retry/timeout/dedup/
-  reassembly logic deterministically.
-- `docs/architecture/adr-0003-uiop-transport.md`,
-  `docs/standards/uiop-profile.md`.
+## Phase 2 — UIOP transport (done)
+- `runtime/include/hace/uiop.h` / `runtime/src/uiop/uiop.c`: UDP
+  datagram framing for the GIOP messages Phase 1 encodes/decodes, with
+  `max_datagram_size` bounded to `[HACE_UIOP_MIN_DATAGRAM_SIZE,
+  HACE_UIOP_MAX_DATAGRAM_SIZE]`.
+- Twoway call semantics (`hace_uiop_call`): request-id, bounded
+  retry/timeout, statically configured per call (`per_attempt_timeout_ms`,
+  `max_attempts`).
+- Oneway semantics: `hace_uiop_send_message` alone, with no following
+  `hace_uiop_call`/`hace_uiop_receive` — fire-and-forget, no retry, a
+  documented profile deviation from IIOP's reliable-transport-backed
+  oneway (see `docs/corba-spec-gap-analysis.md` §7).
+- Real fragmentation in both directions: `hace_uiop_send_message` splits
+  an oversized message across bounded `HACE_GIOP_MSG_FRAGMENT`
+  datagrams; `hace_uiop_receive` reassembles them transparently,
+  bounded by `HACE_UIOP_MAX_FRAGMENTS`.
+- Fault-injecting transport for deterministic retry/timeout/
+  fragmentation testing (`runtime/tests/test_uiop.c`'s
+  `fault_injection_ctx_t`), via the injected-transport seam
+  (`hace_uiop_transport_t`) rather than a global HAL dependency.
+- `docs/architecture/adr-0003-uiop-transport.md` records the design
+  (byte-cut fragmentation with a size floor, the "header fields never
+  split" GIOP behavior it relies on, the injected-transport pattern,
+  the single-outstanding-call scope boundary, and the `hal.h` move to
+  the public include tree this phase required).
 
 ## Phase 3 — Minimal ORB / POA
 - Compact-Profile POA: static object activation, no DII/DSI/IR.
 - Compact IOR encoding (host, UDP port, object key).
 - Bounded fixed thread/task pool with RT-CORBA-inspired priority mapping.
+- A multi-session server dispatch loop, built on Phase 2's
+  `hace_uiop_receive` (called with `HACE_GIOP_MSG_REQUEST` and
+  `match_request_id = NULL`) rather than reinventing reassembly — but
+  needing its own bookkeeping across concurrent in-flight requests,
+  since Phase 2 only tracks one reassembly session per call.
 - `docs/architecture/adr-0004-memory-model.md` (pool-based allocation).
 
 ## Phase 4 — hace-idlc language backends

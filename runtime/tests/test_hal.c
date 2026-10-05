@@ -1,4 +1,4 @@
-#include "../src/hal/hal.h"
+#include "hace/hal.h"
 #include "test_framework.h"
 
 #include <string.h>

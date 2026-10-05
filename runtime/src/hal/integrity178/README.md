@@ -1,6 +1,6 @@
 # INTEGRITY-178 tuMP HAL backend — blocked on Green Hills SDK access
 
-This backend implements `runtime/src/hal/hal.h` for Green Hills
+This backend implements `runtime/include/hace/hal.h` for Green Hills
 INTEGRITY-178 tuMP. It currently compiles as a **stub**: every function
 returns `HACE_HAL_ERR_NOT_IMPLEMENTED`.
 
@@ -30,7 +30,7 @@ Whoever has Green Hills SDK access needs to fill in
 
 The function contracts (blocking behavior, bounded-datagram-size
 rejection instead of truncation, no dynamic allocation) are specified in
-`runtime/src/hal/hal.h` and must be preserved exactly — the runtime above
+`runtime/include/hace/hal.h` and must be preserved exactly — the runtime above
 the HAL is written once against that contract and must behave the same
 on both targets.
 

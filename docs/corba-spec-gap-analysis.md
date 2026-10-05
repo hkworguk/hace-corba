@@ -11,12 +11,13 @@ Interface Repository are *out of scope by design*, not gaps — they're
 listed below for completeness, marked accordingly, and their absence has
 nothing to do with UDP.
 
-**Status as of Phase 1 completion** (see `docs/roadmap.md` and
-`docs/architecture/adr-0002-giop-framing.md`): CDR is complete for this
-project's needs and the full GIOP message set is encodable/decodable.
-Nothing below that's now built is re-evaluated for UDP-feasibility,
-since it's done — the remaining open items are all Phase 2+ (the actual
-UDP transport) or Phase 3+ (ORB/POA) territory.
+**Status as of Phase 2 completion** (see `docs/roadmap.md` and
+`docs/architecture/adr-0002-giop-framing.md`/`adr-0003-uiop-transport.md`):
+CDR is complete for this project's needs, the full GIOP message set is
+encodable/decodable, and all of it now actually moves over real UDP
+sockets with bounded retry/timeout and real fragmentation. Nothing
+below that's now built is re-evaluated for UDP-feasibility, since it's
+done — the remaining open items are all Phase 3+ (ORB/POA) territory.
 
 ## 1. CDR (Common Data Representation) — formal/12-11-14 §9
 
@@ -34,11 +35,11 @@ UDP transport) or Phase 3+ (ORB/POA) territory.
 
 | Message | Status |
 |---|---|
-| Request, Reply | **Done** (encode/decode only — `runtime/include/hace/giop.h`). Actually sending/receiving them over UDP is Phase 2. |
-| LocateRequest, LocateReply | **Done** (encode/decode only). |
-| CancelRequest | **Done** (encode/decode only). Over UDP this is inherently best-effort (the target may already have replied, or the cancel datagram may itself be lost) — arguably a more *honest* fit for CancelRequest's already-advisory semantics than TCP gives it. |
+| Request, Reply | **Done**, including actually sending/receiving over UDP (`runtime/include/hace/uiop.h`'s `hace_uiop_send_message`/`hace_uiop_call`/`hace_uiop_receive`, Phase 2) with bounded retry/timeout for twoway calls. |
+| LocateRequest, LocateReply | **Done** (encode/decode only — nothing yet sends these over the wire, since there's no ORB/POA (Phase 3) to locate objects for). |
+| CancelRequest | **Done** (encode/decode only, same reason as LocateRequest/Reply above). Over UDP this is inherently best-effort (the target may already have replied, or the cancel datagram may itself be lost) — arguably a more *honest* fit for CancelRequest's already-advisory semantics than TCP gives it. |
 | MessageError | **Done** — needs no per-type function at all: `hace_giop_begin_message` + `hace_giop_finish_message(..., HACE_GIOP_MSG_MESSAGE_ERROR, ...)` with nothing encoded in between already produces a valid zero-body MessageError. |
-| Fragment (header only) | **Done** (header — `request_id` — only). The actual "split a message across N datagrams and reassemble" state machine is Phase 2, a transport concern, not a wire-format one. |
+| Fragment | **Done**, including real fragmentation in practice: `hace_uiop_send_message` splits an oversized Request/Reply across bounded `HACE_GIOP_MSG_FRAGMENT` datagrams, `hace_uiop_receive` reassembles them, both bounded by `HACE_UIOP_MAX_FRAGMENTS` (Phase 2). |
 | **CloseConnection** | **N/A — not implementable over UDP, by nature of the message, not a limitation of this project.** CloseConnection exists to signal that a GIOP implementation is tearing down its underlying TCP connection. UDP has no connection to close; there is nothing for this message to mean. `hace_giop_message_type_t` still numbers it correctly for spec-fidelity, and decoding one isn't itself an error, but nothing in this project emits or acts on it — see `docs/architecture/adr-0002-giop-framing.md`. |
 
 ## 3. IIOP / IOR — formal/12-11-14 §7.6, §9
@@ -121,13 +122,17 @@ LocateReply/MessageError/Fragment-header), with `CloseConnection`
 explicitly documented as N/A rather than left as an open "TODO" — see
 `docs/architecture/adr-0002-giop-framing.md`.
 
-**Phase 2 (UIOP transport)**
-1. Send/receive the Phase 1 GIOP messages over actual UDP sockets.
-2. Request-id tracking, bounded retry/timeout for twoway calls.
-3. Real fragmentation: splitting an oversized message across a bounded
-   number of Fragment datagrams and reassembling them on receipt.
-4. Bidirectional object references for callbacks (no BiDirIIOP-style
-   negotiation needed — see §8 above).
+**Phase 2 (UIOP transport) — done.** Send/receive the Phase 1 GIOP
+messages over actual UDP sockets (`hace_uiop_send_message`), request-id
+tracking with bounded retry/timeout for twoway calls (`hace_uiop_call`),
+and real fragmentation — splitting an oversized message across a
+bounded number of Fragment datagrams and reassembling them on receipt
+(`hace_uiop_receive`), tested with a fault-injecting transport for
+deterministic retry/timeout/fragmentation coverage — see
+`docs/architecture/adr-0003-uiop-transport.md`. Bidirectional object
+references for callbacks (no BiDirIIOP-style negotiation needed — see
+§8 above) remain for whenever the observer/attach example (Phase 5)
+is built, since that's what motivates them, not Phase 2 itself.
 
 **Phase 3 (ORB core / POA)**
 1. `ORB_init`, `resolve_initial_references`, `object_to_string`/
@@ -154,7 +159,7 @@ explicitly documented as N/A rather than left as an open "TODO" — see
 ## Summary
 
 Almost everything missing is missing simply because it hasn't been
-built yet (Phases 2-3 of the existing roadmap), not because UDP makes it
+built yet (Phase 3 of the existing roadmap), not because UDP makes it
 impossible. The only spec-level casualties of choosing UDP are:
 **GIOP CloseConnection** (no connection to close) and **RT-CORBA
 priority-banded/private connections** (no connections to band) — both

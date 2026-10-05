@@ -333,6 +333,55 @@ static int test_octet_seq_roundtrip(void)
     return 1;
 }
 
+static int test_raw_bytes_roundtrip(void)
+{
+    uint8_t storage[8];
+    hace_cdr_buffer_t buf;
+    const uint8_t data[] = {0x11U, 0x22U, 0x33U};
+    uint8_t out[3];
+
+    HACE_ASSERT_TRUE(hace_cdr_buffer_init(&buf, storage, sizeof(storage),
+                                           HACE_CDR_BIG_ENDIAN) == HACE_CDR_OK);
+    /* No length prefix is written: a single octet followed directly by
+     * the raw bytes should advance position by exactly 1 + 3 = 4. */
+    HACE_ASSERT_TRUE(hace_cdr_encode_octet(&buf, 0xAAU) == HACE_CDR_OK);
+    HACE_ASSERT_TRUE(hace_cdr_encode_raw_bytes(&buf, data, sizeof(data)) ==
+                      HACE_CDR_OK);
+    HACE_ASSERT_EQ_INT(4, buf.position);
+
+    buf.position = 0U;
+    {
+        uint8_t marker;
+        HACE_ASSERT_TRUE(hace_cdr_decode_octet(&buf, &marker) == HACE_CDR_OK);
+        HACE_ASSERT_EQ_INT(0xAA, marker);
+    }
+    HACE_ASSERT_TRUE(hace_cdr_decode_raw_bytes(&buf, out, sizeof(out)) ==
+                      HACE_CDR_OK);
+    HACE_ASSERT_TRUE(memcmp(out, data, sizeof(data)) == 0);
+    return 1;
+}
+
+static int test_raw_bytes_bounds_are_rejected(void)
+{
+    uint8_t storage[4];
+    hace_cdr_buffer_t buf;
+    uint8_t data[4] = {0};
+    uint8_t out[4];
+
+    HACE_ASSERT_TRUE(hace_cdr_buffer_init(&buf, storage, sizeof(storage),
+                                           HACE_CDR_BIG_ENDIAN) == HACE_CDR_OK);
+    HACE_ASSERT_TRUE(hace_cdr_encode_raw_bytes(&buf, data, 5U) ==
+                      HACE_CDR_ERR_BUFFER_OVERFLOW);
+    HACE_ASSERT_EQ_INT(0, buf.position);
+
+    HACE_ASSERT_TRUE(hace_cdr_encode_raw_bytes(&buf, data, sizeof(data)) ==
+                      HACE_CDR_OK);
+    buf.position = 0U;
+    HACE_ASSERT_TRUE(hace_cdr_decode_raw_bytes(&buf, out, 5U) ==
+                      HACE_CDR_ERR_BUFFER_UNDERFLOW);
+    return 1;
+}
+
 static int test_struct_pattern_example(void)
 {
     /* Demonstrates that CDR structs need no dedicated API: a struct is
@@ -416,6 +465,8 @@ int main(void)
     HACE_RUN_TEST(test_string_too_long_is_rejected);
     HACE_RUN_TEST(test_sequence_length);
     HACE_RUN_TEST(test_octet_seq_roundtrip);
+    HACE_RUN_TEST(test_raw_bytes_roundtrip);
+    HACE_RUN_TEST(test_raw_bytes_bounds_are_rejected);
     HACE_RUN_TEST(test_struct_pattern_example);
     HACE_RUN_TEST(test_union_pattern_example);
     HACE_RUN_TEST(test_null_arguments_are_rejected);

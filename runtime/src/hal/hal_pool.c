@@ -3,7 +3,7 @@
  * backend, since it touches no OS facilities. See hal.h for the API
  * contract (no dynamic allocation; all storage is caller-provided).
  */
-#include "hal.h"
+#include "hace/hal.h"
 
 hace_hal_status_t hace_hal_pool_init(hace_hal_pool_t *pool, uint8_t *storage,
                                       uint8_t *free_bitmap, size_t block_size,

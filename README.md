@@ -7,24 +7,30 @@ Assurance Level C (DAL C) certification.
 ## Status
 
 Early scaffold. See `docs/roadmap.md` for the full phased plan. Phase 0
-(foundations) and Phase 1 (CDR + GIOP message framing) are done — there
-is no UIOP transport (actually sending these over UDP, retry/timeout,
-fragmentation-in-practice) or ORB/POA yet, so nothing here can make an
-actual CORBA RPC/oneway/async/observer call. Ada95 and Rust bindings
-exist for the CDR + HAL core (not yet extended to the new GIOP module),
-with examples that round-trip a CDR-encoded message over a raw UDP
-socket — see `bindings/` and `examples/`. See
-`docs/corba-spec-gap-analysis.md` for the full item-by-item check of
-this implementation against the OMG CORBA spec.
+(foundations), Phase 1 (CDR + GIOP message framing), and Phase 2 (UIOP
+transport: send/receive over real UDP sockets, bounded retry/timeout,
+real fragmentation) are done — there is no ORB/POA yet, so nothing here
+can make an actual CORBA object-oriented RPC/oneway/async/observer call
+(no object references, no POA dispatch), though the underlying
+request/reply/oneway/fragmented messaging that will carry those calls
+is fully working end-to-end over loopback UDP today (see
+`runtime/tests/test_uiop.c`). Ada95 and Rust bindings exist for the CDR
++ HAL core (not yet extended to the GIOP/UIOP modules), with examples
+that round-trip a CDR-encoded message over a raw UDP socket — see
+`bindings/` and `examples/`. See `docs/corba-spec-gap-analysis.md` for
+the full item-by-item check of this implementation against the OMG
+CORBA spec.
 
 ## What this is
 
 - A CORBA runtime (`runtime/`, C99) implementing the Common Data
-  Representation (CDR) and GIOP message encoding from OMG's CORBA
-  Interoperability specification (`runtime/include/hace/cdr.h`,
-  `runtime/include/hace/giop.h`) — currently as pure encode/decode over
-  caller-supplied buffers, with the actual UDP transport (Phase 2,
-  "UIOP") not yet built.
+  Representation (CDR), GIOP message encoding, and the UIOP UDP
+  transport from OMG's CORBA Interoperability specification
+  (`runtime/include/hace/cdr.h`, `giop.h`, `uiop.h`) — request/reply
+  with bounded retry/timeout, oneway, and real fragmentation across
+  datagrams, all working over actual UDP sockets. What's still missing
+  is the ORB/POA layer that would give this object references and
+  dispatch (Phase 3).
 - Hand-written Ada95 and Rust bindings (`bindings/`) onto that runtime's
   CDR and HAL layers, for host tooling and non-safety-critical
   application code — not part of the DAL C certification boundary (see

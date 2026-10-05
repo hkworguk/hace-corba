@@ -12,7 +12,7 @@
  * the HAL contract (hal.h) has two implementations to keep it honest —
  * even though this one does nothing yet.
  */
-#include "../hal.h"
+#include "hace/hal.h"
 
 hace_hal_status_t hace_hal_time_now(hace_hal_time_t *out_time)
 {

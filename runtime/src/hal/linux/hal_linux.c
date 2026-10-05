@@ -8,7 +8,7 @@
  */
 #define _POSIX_C_SOURCE 200809L
 
-#include "../hal.h"
+#include "hace/hal.h"
 
 #include <arpa/inet.h>
 #include <errno.h>

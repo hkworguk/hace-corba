@@ -166,6 +166,17 @@ hace_cdr_status_t hace_cdr_decode_octet_seq(hace_cdr_buffer_t *buf,
                                              uint8_t *out, size_t max_count,
                                              size_t *out_count);
 
+/* Copies length raw bytes verbatim: no length prefix, no alignment, no
+ * byte-swapping (same convention as sequence<octet>'s payload, just
+ * without the length prefix). For copying an already-framed blob of
+ * known length, such as a GIOP Fragment's continuation bytes, which
+ * are appended raw rather than re-wrapped as a sequence<octet>. */
+hace_cdr_status_t hace_cdr_encode_raw_bytes(hace_cdr_buffer_t *buf,
+                                             const uint8_t *data,
+                                             size_t length);
+hace_cdr_status_t hace_cdr_decode_raw_bytes(hace_cdr_buffer_t *buf,
+                                             uint8_t *out, size_t length);
+
 #ifdef __cplusplus
 }
 #endif

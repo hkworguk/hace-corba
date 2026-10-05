@@ -5,6 +5,7 @@ endif()
 set(HACE_CORE_SOURCES
     src/cdr/cdr.c
     src/giop/giop.c
+    src/uiop/uiop.c
     src/hal/hal_pool.c
 )
 

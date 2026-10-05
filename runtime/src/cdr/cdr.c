@@ -469,3 +469,35 @@ hace_cdr_status_t hace_cdr_decode_octet_seq(hace_cdr_buffer_t *buf,
     }
     return HACE_CDR_OK;
 }
+
+hace_cdr_status_t hace_cdr_encode_raw_bytes(hace_cdr_buffer_t *buf,
+                                             const uint8_t *data, size_t length)
+{
+    if ((buf == NULL) || ((data == NULL) && (length > 0U))) {
+        return HACE_CDR_ERR_INVALID_ARGUMENT;
+    }
+    if ((buf->position + length) > buf->capacity) {
+        return HACE_CDR_ERR_BUFFER_OVERFLOW;
+    }
+    if (length > 0U) {
+        (void)memcpy(&buf->data[buf->position], data, length);
+    }
+    buf->position += length;
+    return HACE_CDR_OK;
+}
+
+hace_cdr_status_t hace_cdr_decode_raw_bytes(hace_cdr_buffer_t *buf,
+                                             uint8_t *out, size_t length)
+{
+    if ((buf == NULL) || ((out == NULL) && (length > 0U))) {
+        return HACE_CDR_ERR_INVALID_ARGUMENT;
+    }
+    if ((buf->position + length) > buf->capacity) {
+        return HACE_CDR_ERR_BUFFER_UNDERFLOW;
+    }
+    if (length > 0U) {
+        (void)memcpy(out, &buf->data[buf->position], length);
+    }
+    buf->position += length;
+    return HACE_CDR_OK;
+}
