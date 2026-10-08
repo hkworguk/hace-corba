@@ -6,6 +6,9 @@ set(HACE_CORE_SOURCES
     src/cdr/cdr.c
     src/giop/giop.c
     src/uiop/uiop.c
+    src/corba/corba_exception.c
+    src/corba/corba_ior.c
+    src/corba/corba_poa.c
     src/hal/hal_pool.c
 )
 

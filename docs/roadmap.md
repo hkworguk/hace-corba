@@ -8,9 +8,9 @@ priority-banded connections) versus excluded on scope grounds regardless
 of transport (DII/DSI/IR, `any`/TypeCode, valuetypes, CORBA Components,
 Security/Transactions/Notification/Event/FT-CORBA services).
 
-hace-corba is a multi-phase program. Phase 0 and Phase 1 are built, plus
-hand-written Ada95/Rust bindings and examples for what Phase 1's CDR
-core covers (see `README.md` for what's implemented right now).
+hace-corba is a multi-phase program. Phase 0 through Phase 3 are built,
+plus hand-written Ada95/Rust bindings and examples for what Phase 1's
+CDR core covers (see `README.md` for what's implemented right now).
 Everything else below is planned, not yet built.
 
 ## Phase 0 — Foundations (done)
@@ -76,16 +76,35 @@ Everything else below is planned, not yet built.
   the single-outstanding-call scope boundary, and the `hal.h` move to
   the public include tree this phase required).
 
-## Phase 3 — Minimal ORB / POA
-- Compact-Profile POA: static object activation, no DII/DSI/IR.
-- Compact IOR encoding (host, UDP port, object key).
-- Bounded fixed thread/task pool with RT-CORBA-inspired priority mapping.
-- A multi-session server dispatch loop, built on Phase 2's
-  `hace_uiop_receive` (called with `HACE_GIOP_MSG_REQUEST` and
-  `match_request_id = NULL`) rather than reinventing reassembly — but
-  needing its own bookkeeping across concurrent in-flight requests,
-  since Phase 2 only tracks one reassembly session per call.
-- `docs/architecture/adr-0004-memory-model.md` (pool-based allocation).
+## Phase 3 — Minimal ORB / POA (done)
+- CORBA exception model (`runtime/include/hace/corba_exception.h`): a
+  chosen subset of 9 system exceptions (not the full ~34), a plain
+  three-`u32` wire encoding instead of GIOP's repository-ID-string
+  convention, and `hace_corba_exception_from_uiop_status` mapping
+  transport failures onto them.
+- Compact IOR encoding (`corba_ior.h`: host, UDP port, object key) plus
+  `object_to_string`/`string_to_object` using a hand-rolled
+  `uiop:host:port/hexkey` scheme (no `snprintf`/`sscanf` — see
+  `docs/architecture/adr-0004-corba-core.md`).
+- Compact-Profile POA (`corba_poa.h`): static object activation only,
+  no DII/DSI/IR; `hace_corba_poa_handle_one_request` dispatches one
+  Request to its activated servant and sends the Reply (or nothing, for
+  oneway); unknown object keys get an `OBJECT_NOT_EXIST` system
+  exception reply instead of reaching a servant.
+- Bounded worker-task pool with RT-CORBA-inspired priority mapping:
+  `hace_corba_poa_run` is the loop a `hace_hal_task_create` worker
+  calls; running several at once against the same socket is this
+  project's "multi-session server dispatch," needing no new
+  session-tracking structure since `hace_uiop_receive` (Phase 2)
+  already reassembles fragments per-call on the caller's own stack.
+- Found and fixed along the way: `hace_uiop_receive` didn't surface the
+  object key/operation a dispatcher needs (added
+  `hace_uiop_request_info_t`), and `hal_linux.c`'s two-syscall
+  peek-then-read `recv` had a real race under the worker pool's
+  concurrent callers — collapsed to one atomic `MSG_TRUNC` call. See
+  the ADR for both.
+- No separate "ORB" module (`ORB_init`/`resolve_initial_references`) —
+  an explicit scope reduction, not a silently dropped item; see the ADR.
 
 ## Phase 4 — hace-idlc language backends
 - IDL lexer/parser/AST/semantic model (OMG IDL grammar per formal/21-02-02).
@@ -102,10 +121,13 @@ Everything else below is planned, not yet built.
   point for what generated code should produce.
 
 ## Phase 5 — Examples
-- Done (CDR + HAL only, ahead of the ORB): `examples/rust/cdr_udp_echo`
+- Done (CDR + HAL only, predating the ORB): `examples/rust/cdr_udp_echo`
   and `examples/ada95/cdr_udp_echo` — encode with CDR, round-trip over a
-  raw UDP HAL socket, decode. Not RPC examples; there's no ORB yet.
-- Once Phase 2-3 land, the real RPC-style examples:
+  raw UDP HAL socket, decode. Not RPC examples.
+- Now buildable (Phase 3's POA/dispatch landed): the real RPC-style
+  examples, written directly against `hace_corba_poa_t`/
+  `hace_corba_servant_fn_t`/`hace_uiop_call` (hand-written, since
+  `idlc` — Phase 4 — doesn't generate stubs/skeletons yet):
   - `rpc_basic`: synchronous twoway call.
   - `oneway`: fire-and-forget call.
   - `async_ami`: Poller-style asynchronous invocation (send now,

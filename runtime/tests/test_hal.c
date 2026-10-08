@@ -189,6 +189,111 @@ static int test_concurrent_socket_open_is_race_free(void)
     return 1;
 }
 
+#define HACE_RECV_RACE_TASK_COUNT 4
+
+typedef struct {
+    hace_hal_socket_handle_t socket;
+    int ok;
+} hace_recv_race_ctx_t;
+
+static void hace_recv_race_task(void *arg)
+{
+    hace_recv_race_ctx_t *ctx = (hace_recv_race_ctx_t *)arg;
+    uint8_t buffer[64];
+    size_t received_length = 0U;
+    size_t i;
+
+    ctx->ok = 0;
+    if (hace_hal_socket_recv(ctx->socket, buffer, sizeof(buffer), &received_length,
+                              NULL, NULL, 2000U) != HACE_HAL_OK) {
+        return;
+    }
+    /* Every datagram sent below is self-describing: byte i == (uint8_t)i.
+     * A mismatch here means this task's reported length didn't match
+     * the datagram it actually got -- exactly the failure mode of the
+     * old two-step peek-then-read recv under concurrent callers (see
+     * hace_hal_socket_recv in hal_linux.c). */
+    for (i = 0U; i < received_length; i++) {
+        if (buffer[i] != (uint8_t)i) {
+            return;
+        }
+    }
+    ctx->ok = 1;
+}
+
+static int test_concurrent_recv_is_race_free(void)
+{
+    /* Regression test: hace_hal_socket_recv used to peek a datagram's
+     * size, then separately consume it -- two syscalls with a window
+     * in between. Multiple tasks calling recv concurrently on the same
+     * socket (exactly what a POA worker-task pool does) could have one
+     * task's peek describe a datagram a different task consumes
+     * first, leaving the first task to read and misreport whatever
+     * differently-sized datagram arrives next. Four tasks block in
+     * recv concurrently while four differently-sized datagrams arrive
+     * in quick succession; each task must get back a complete,
+     * correctly-sized datagram regardless of which one. */
+    hace_hal_socket_handle_t receiver_socket = HACE_HAL_INVALID_SOCKET;
+    hace_hal_socket_handle_t sender_socket = HACE_HAL_INVALID_SOCKET;
+    hace_hal_task_handle_t tasks[HACE_RECV_RACE_TASK_COUNT];
+    hace_recv_race_ctx_t contexts[HACE_RECV_RACE_TASK_COUNT];
+    uint8_t message_tiny[4];
+    uint8_t message_small[16];
+    uint8_t message_medium[32];
+    uint8_t message_large[60];
+    uint32_t loopback = (127U << 24) | 1U;
+    int i;
+    int all_ok = 1;
+
+    for (i = 0; i < (int)sizeof(message_tiny); i++) {
+        message_tiny[i] = (uint8_t)i;
+    }
+    for (i = 0; i < (int)sizeof(message_small); i++) {
+        message_small[i] = (uint8_t)i;
+    }
+    for (i = 0; i < (int)sizeof(message_medium); i++) {
+        message_medium[i] = (uint8_t)i;
+    }
+    for (i = 0; i < (int)sizeof(message_large); i++) {
+        message_large[i] = (uint8_t)i;
+    }
+
+    HACE_ASSERT_TRUE(hace_hal_socket_open(&receiver_socket, 58271U) == HACE_HAL_OK);
+    HACE_ASSERT_TRUE(hace_hal_socket_open(&sender_socket, 58272U) == HACE_HAL_OK);
+
+    for (i = 0; i < HACE_RECV_RACE_TASK_COUNT; i++) {
+        contexts[i].socket = receiver_socket;
+        contexts[i].ok = 0;
+        HACE_ASSERT_TRUE(hace_hal_task_create(&tasks[i], hace_recv_race_task,
+                                               &contexts[i], 0) == HACE_HAL_OK);
+    }
+
+    HACE_ASSERT_TRUE(hace_hal_socket_send(sender_socket, message_tiny,
+                                           sizeof(message_tiny), loopback,
+                                           58271U) == HACE_HAL_OK);
+    HACE_ASSERT_TRUE(hace_hal_socket_send(sender_socket, message_small,
+                                           sizeof(message_small), loopback,
+                                           58271U) == HACE_HAL_OK);
+    HACE_ASSERT_TRUE(hace_hal_socket_send(sender_socket, message_medium,
+                                           sizeof(message_medium), loopback,
+                                           58271U) == HACE_HAL_OK);
+    HACE_ASSERT_TRUE(hace_hal_socket_send(sender_socket, message_large,
+                                           sizeof(message_large), loopback,
+                                           58271U) == HACE_HAL_OK);
+
+    for (i = 0; i < HACE_RECV_RACE_TASK_COUNT; i++) {
+        HACE_ASSERT_TRUE(hace_hal_task_join(tasks[i]) == HACE_HAL_OK);
+        if (!contexts[i].ok) {
+            all_ok = 0;
+        }
+    }
+
+    HACE_ASSERT_TRUE(all_ok);
+    HACE_ASSERT_TRUE(hace_hal_socket_close(receiver_socket) == HACE_HAL_OK);
+    HACE_ASSERT_TRUE(hace_hal_socket_close(sender_socket) == HACE_HAL_OK);
+    return 1;
+}
+
 int main(void)
 {
     HACE_RUN_TEST(test_monotonic_time_moves_forward);
@@ -197,5 +302,6 @@ int main(void)
     HACE_RUN_TEST(test_udp_recv_times_out_when_idle);
     HACE_RUN_TEST(test_oversized_datagram_is_rejected_not_truncated);
     HACE_RUN_TEST(test_concurrent_socket_open_is_race_free);
+    HACE_RUN_TEST(test_concurrent_recv_is_race_free);
     HACE_TEST_REPORT();
 }

@@ -222,7 +222,8 @@ hace_uiop_status_t hace_uiop_receive(const hace_uiop_transport_t *transport,
                                       hace_giop_reply_status_t *out_reply_status,
                                       size_t *out_body_length,
                                       uint32_t *out_src_addr_ipv4,
-                                      uint16_t *out_src_port)
+                                      uint16_t *out_src_port,
+                                      hace_uiop_request_info_t *out_request_info)
 {
     hace_hal_time_t start_time;
     uint64_t start_ms;
@@ -235,6 +236,9 @@ hace_uiop_status_t hace_uiop_receive(const hace_uiop_transport_t *transport,
     hace_giop_reply_status_t first_reply_status = HACE_GIOP_REPLY_NO_EXCEPTION;
     uint32_t first_src_addr = 0U;
     uint16_t first_src_port = 0U;
+    hace_uiop_request_info_t first_request_info;
+
+    memset(&first_request_info, 0, sizeof(first_request_info));
 
     if ((transport == NULL) || (transport->recv == NULL) || (body_storage == NULL) ||
         (out_header == NULL) || (out_request_id == NULL) || (out_body_length == NULL)) {
@@ -303,6 +307,14 @@ hace_uiop_status_t hace_uiop_receive(const hace_uiop_transport_t *transport,
                 decode_status = hace_giop_decode_request_header(
                     &datagram_buf, header.message_size, &req_header, &chunk_view);
                 this_request_id = req_header.request_id;
+                if (decode_status == HACE_GIOP_OK) {
+                    (void)memcpy(first_request_info.object_key, req_header.object_key,
+                                 sizeof(first_request_info.object_key));
+                    first_request_info.object_key_length = req_header.object_key_length;
+                    (void)memcpy(first_request_info.operation, req_header.operation,
+                                 sizeof(first_request_info.operation));
+                    first_request_info.response_expected = req_header.response_expected;
+                }
             } else {
                 hace_giop_reply_header_t reply_header;
                 decode_status = hace_giop_decode_reply_header(
@@ -349,6 +361,9 @@ hace_uiop_status_t hace_uiop_receive(const hace_uiop_transport_t *transport,
                 if (out_src_port != NULL) {
                     *out_src_port = first_src_port;
                 }
+                if (out_request_info != NULL) {
+                    *out_request_info = first_request_info;
+                }
                 return HACE_UIOP_OK;
             }
             have_first_chunk = 1;
@@ -392,6 +407,9 @@ hace_uiop_status_t hace_uiop_receive(const hace_uiop_transport_t *transport,
                 }
                 if (out_src_port != NULL) {
                     *out_src_port = first_src_port;
+                }
+                if (out_request_info != NULL) {
+                    *out_request_info = first_request_info;
                 }
                 return HACE_UIOP_OK;
             }
@@ -438,7 +456,7 @@ hace_uiop_status_t hace_uiop_call(const hace_uiop_transport_t *transport,
                                          per_attempt_timeout_ms, reply_body_storage,
                                          reply_body_capacity, &reply_header,
                                          &reply_request_id, out_reply_status,
-                                         out_reply_body_length, NULL, NULL);
+                                         out_reply_body_length, NULL, NULL, NULL);
         if (recv_status == HACE_UIOP_OK) {
             return HACE_UIOP_OK;
         }

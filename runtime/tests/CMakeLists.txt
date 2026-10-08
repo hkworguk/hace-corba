@@ -10,6 +10,18 @@ target_include_directories(test_giop PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 add_test(NAME test_giop COMMAND test_giop)
 
+add_executable(test_corba_exception test_corba_exception.c)
+target_link_libraries(test_corba_exception PRIVATE hace_corba_core)
+target_include_directories(test_corba_exception PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+
+add_test(NAME test_corba_exception COMMAND test_corba_exception)
+
+add_executable(test_corba_ior test_corba_ior.c)
+target_link_libraries(test_corba_ior PRIVATE hace_corba_core)
+target_include_directories(test_corba_ior PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+
+add_test(NAME test_corba_ior COMMAND test_corba_ior)
+
 if(HACE_TARGET_PLATFORM STREQUAL "linux")
     add_executable(test_hal test_hal.c)
     target_link_libraries(test_hal PRIVATE hace_corba_core)
@@ -27,4 +39,11 @@ if(HACE_TARGET_PLATFORM STREQUAL "linux")
 
     add_test(NAME test_uiop COMMAND test_uiop)
     set_tests_properties(test_uiop PROPERTIES TIMEOUT 30)
+
+    add_executable(test_corba_poa test_corba_poa.c)
+    target_link_libraries(test_corba_poa PRIVATE hace_corba_core)
+    target_include_directories(test_corba_poa PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+
+    add_test(NAME test_corba_poa COMMAND test_corba_poa)
+    set_tests_properties(test_corba_poa PROPERTIES TIMEOUT 30)
 endif()

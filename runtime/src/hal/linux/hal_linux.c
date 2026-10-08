@@ -180,8 +180,7 @@ hace_hal_status_t hace_hal_socket_recv(hace_hal_socket_handle_t handle,
     socklen_t src_len = sizeof(src);
     struct timeval tv;
     ssize_t received;
-    uint8_t peek_byte;
-    int peek_flags = MSG_PEEK | MSG_TRUNC;
+    int recv_flags = MSG_TRUNC;
 
     if ((fd < 0) || (buffer == NULL) || (out_length == NULL)) {
         return HACE_HAL_ERR_INVALID_ARGUMENT;
@@ -192,7 +191,7 @@ hace_hal_status_t hace_hal_socket_recv(hace_hal_socket_handle_t handle,
      * (poll/non-blocking, per hal.h) is handled separately via
      * MSG_DONTWAIT instead of relying on SO_RCVTIMEO. */
     if (timeout_ms == 0U) {
-        peek_flags |= MSG_DONTWAIT;
+        recv_flags |= MSG_DONTWAIT;
     } else {
         tv.tv_sec = (time_t)(timeout_ms / 1000U);
         tv.tv_usec = (suseconds_t)((timeout_ms % 1000U) * 1000U);
@@ -201,9 +200,19 @@ hace_hal_status_t hace_hal_socket_recv(hace_hal_socket_handle_t handle,
         }
     }
 
-    /* Peek the real datagram length first so an oversized datagram can be
-     * rejected without truncating it into the caller's buffer. */
-    received = recvfrom(fd, &peek_byte, 0, peek_flags, NULL, NULL);
+    /* A single call: MSG_TRUNC makes recvfrom report a UDP datagram's
+     * true size even when it's larger than `capacity` (still only
+     * writing `capacity` bytes into buffer), so an oversized datagram
+     * can be detected and rejected without a separate peek step. This
+     * matters beyond simplicity: peek-then-read is two syscalls with a
+     * window between them, and multiple tasks calling this
+     * concurrently on the same socket (the POA worker-task pool, see
+     * docs/architecture/adr-0004-corba-core.md) could have one task's
+     * peek describe a datagram a different task then consumes first,
+     * leaving the first task to silently read and misreport whatever
+     * arrives next instead. One atomic call has no such window. */
+    received = recvfrom(fd, buffer, capacity, recv_flags, (struct sockaddr *)&src,
+                         &src_len);
     if (received < 0) {
         if ((errno == EAGAIN) || (errno == EWOULDBLOCK)) {
             return (timeout_ms == 0U) ? HACE_HAL_ERR_WOULD_BLOCK
@@ -212,22 +221,10 @@ hace_hal_status_t hace_hal_socket_recv(hace_hal_socket_handle_t handle,
         return HACE_HAL_ERR;
     }
     if ((size_t)received > capacity) {
-        uint8_t discard[1];
-        (void)recvfrom(fd, discard, sizeof(discard), 0, NULL, NULL);
+        /* The datagram was still consumed (removed from the queue) by
+         * the call above; reject rather than accept the truncated
+         * bytes now sitting in buffer. */
         return HACE_HAL_ERR_INVALID_ARGUMENT;
-    }
-
-    received = recvfrom(fd, buffer, capacity,
-                         (timeout_ms == 0U) ? MSG_DONTWAIT : 0,
-                         (struct sockaddr *)&src, &src_len);
-    if (received < 0) {
-        if ((timeout_ms == 0U) && ((errno == EAGAIN) || (errno == EWOULDBLOCK))) {
-            /* The peeked datagram was consumed by another reader between
-             * the peek and this call; treat it the same as "nothing
-             * pending" rather than a hard error. */
-            return HACE_HAL_ERR_WOULD_BLOCK;
-        }
-        return HACE_HAL_ERR;
     }
 
     *out_length = (size_t)received;

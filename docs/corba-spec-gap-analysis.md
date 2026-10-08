@@ -11,13 +11,16 @@ Interface Repository are *out of scope by design*, not gaps — they're
 listed below for completeness, marked accordingly, and their absence has
 nothing to do with UDP.
 
-**Status as of Phase 2 completion** (see `docs/roadmap.md` and
-`docs/architecture/adr-0002-giop-framing.md`/`adr-0003-uiop-transport.md`):
-CDR is complete for this project's needs, the full GIOP message set is
-encodable/decodable, and all of it now actually moves over real UDP
-sockets with bounded retry/timeout and real fragmentation. Nothing
+**Status as of Phase 3 completion** (see `docs/roadmap.md` and
+`docs/architecture/adr-0002-giop-framing.md`/`adr-0003-uiop-transport.md`/
+`adr-0004-corba-core.md`): CDR is complete for this project's needs, the
+full GIOP message set is encodable/decodable and moves over real UDP
+sockets with bounded retry/timeout and real fragmentation, and there is
+now a minimal ORB core — exceptions, object references, and a POA that
+actually activates objects and dispatches requests to them. Nothing
 below that's now built is re-evaluated for UDP-feasibility, since it's
-done — the remaining open items are all Phase 3+ (ORB/POA) territory.
+done — the remaining open items are all Phase 4+ (`idlc`, examples,
+platform hardening, certification artifacts) territory.
 
 ## 1. CDR (Common Data Representation) — formal/12-11-14 §9
 
@@ -54,21 +57,22 @@ done — the remaining open items are all Phase 3+ (ORB/POA) territory.
 
 | Item | Status |
 |---|---|
-| `ORB_init`, `resolve_initial_references`, `object_to_string`/`string_to_object`, `shutdown` | **Missing — UDP-feasible (planned, Phase 3).** Entirely transport-independent; this is basic ORB bootstrap that has to exist no matter what. |
-| System exceptions (`COMM_FAILURE`, `TIMEOUT`, `TRANSIENT`, `OBJECT_NOT_EXIST`, etc.) and the user-exception mechanism | **Missing — UDP-feasible (planned, Phase 3).** The GIOP layer built in Phase 1 already has `hace_giop_status_t` for wire/framing errors and `hace_giop_reply_status_t` for `USER_EXCEPTION`/`SYSTEM_EXCEPTION` signaling, but there is no CORBA-level exception *model* (the actual system exception types/minor codes/completion status) yet. Several system exceptions map naturally onto UDP failure modes: a lost/retried datagram becomes `TRANSIENT` or `TIMEOUT`, not `COMM_FAILURE` (which in IIOP usually means "the TCP connection died," a concept UDP doesn't have). |
+| `ORB_init`, `resolve_initial_references`, `shutdown` | **Not built — deliberate scope reduction, not a gap.** Nothing in this minimal profile needs ORB-level state distinct from a HAL socket + a POA, and there's no naming service or second initial reference to make `resolve_initial_references` meaningful. See `docs/architecture/adr-0004-corba-core.md`. |
+| `object_to_string`/`string_to_object` | **Done** (`runtime/include/hace/corba_ior.h`) — pure functions on an IOR struct, no ORB handle needed. Hand-rolled IPv4/hex formatting (no `snprintf`/`sscanf`), a corbaloc-style `uiop:host:port/hexkey` scheme rather than the classic hex-dump `"IOR:"` convention (no interop requirement with ORBs expecting that form). |
+| System exceptions and the user-exception mechanism | **Done** (`runtime/include/hace/corba_exception.h`) — a chosen subset of 9 exceptions (not the full ~34), a plain three-`u32` wire encoding rather than GIOP's repository-ID-string convention (no interop requirement), each carrying a completion status. `hace_corba_exception_from_uiop_status` maps transport failures (`TIMEOUT`, `COMM_FAILURE`, etc.) onto them, matching the UDP-realistic failure modes this section originally called for. |
 
 ## 5. Portable Object Adapter (POA) — formal/21-02-02 §11
 
 | Item | Status |
 |---|---|
-| Static object activation, basic POA policies (compatible with CORBA/e Compact Profile: no DII/DSI-dependent policies) | **Missing — UDP-feasible (planned, Phase 3).** Object dispatch logic is transport-independent. |
+| Static object activation, basic POA policies (compatible with CORBA/e Compact Profile: no DII/DSI-dependent policies) | **Done** (`runtime/include/hace/corba_poa.h`) — a bounded servant table, activated before dispatch begins (so no locking is needed for concurrent worker-task reads), `hace_corba_poa_handle_one_request` dispatching one Request per call. An unrecognized object key gets an `OBJECT_NOT_EXIST` system exception reply rather than reaching a servant. |
 | Dynamic activation (`USE_SERVANT_MANAGER`, etc.), full POA policy set | **Excluded by design** — Compact Profile scope decision already made, not a UDP question. |
 
 ## 6. Real-Time CORBA — formal/05-01-04
 
 | Item | Status |
 |---|---|
-| Thread pools, priority propagation from client to server thread | **Missing — UDP-feasible (planned, Phase 3, borrowing the concepts as already noted in `docs/standards/spec-references.md`).** |
+| Thread pools, priority propagation from client to server thread | **Done** — `hace_corba_poa_run` is the loop a `hace_hal_task_create` worker calls; running several at their own priorities against the same socket is this project's bounded worker-task pool. "Multi-session" concurrent dispatch needed no new session-tracking code, since `hace_uiop_receive` (Phase 2) already reassembles fragments per-call on the caller's own stack — though getting this genuinely concurrent surfaced a real two-syscall race in `hal_linux.c`'s `recv`, fixed along the way (see the ADR). |
 | Priority-banded connections, private connections (RT-CORBA §4) | **N/A — not implementable over UDP.** These policies exist specifically to manage *multiple persistent TCP connections* at different priority bands. UDP has no connections to band or privatize; there's nothing underneath these policies once the transport is connectionless. |
 
 ## 7. Messaging / AMI — formal/21-02-02 §22 (Messaging)
@@ -134,23 +138,23 @@ references for callbacks (no BiDirIIOP-style negotiation needed — see
 §8 above) remain for whenever the observer/attach example (Phase 5)
 is built, since that's what motivates them, not Phase 2 itself.
 
-**Phase 3 (ORB core / POA)**
-1. `ORB_init`, `resolve_initial_references`, `object_to_string`/
-   `string_to_object` (with a `uiop:` URL scheme), `shutdown`.
-2. CORBA exception model: system exceptions mapped onto UDP-realistic
-   failure modes (`TRANSIENT`/`TIMEOUT` for lost-and-retried datagrams,
-   `OBJECT_NOT_EXIST`, etc. — deliberately *not* modeling
-   `COMM_FAILURE` as a first-class case the way IIOP does, since there's
-   no connection to fail).
-3. Static POA (object activation, dispatch) — Compact Profile subset,
-   as already scoped.
-4. IOR encoding with a UIOP profile tag.
-5. RT-CORBA-inspired thread pool + priority propagation (not
-   priority-banded connections — see §6, N/A over UDP).
+**Phase 3 (ORB core / POA) — done.** `object_to_string`/
+`string_to_object` with a `uiop:` scheme (no `ORB_init`/
+`resolve_initial_references` — a deliberate scope reduction, see the
+ADR); a CORBA exception model mapped onto UDP-realistic failure modes
+(`TRANSIENT`/`TIMEOUT` for lost-and-retried datagrams,
+`OBJECT_NOT_EXIST`, etc. — deliberately *not* modeling `COMM_FAILURE`
+as a first-class case the way IIOP does, since there's no connection to
+fail); a static POA (object activation, dispatch) per the Compact
+Profile subset; IOR encoding with a UIOP profile tag; and an
+RT-CORBA-inspired worker-task pool with priority propagation (not
+priority-banded connections — see §6, N/A over UDP). See
+`docs/architecture/adr-0004-corba-core.md`, including a real
+concurrency bug found and fixed while building the worker-pool pattern.
 
 **Optional / later, not in the near-term plan**
-- Naming Service (§9) — straightforward once Phase 3 lands, but not
-  blocking anything else.
+- Naming Service (§9) — straightforward now that Phase 3's POA exists,
+  but not blocking anything else.
 - `ORDER_TEMPORAL`/`ORDER_DEADLINE` sequencing (§7) — only if a concrete
   use case needs strict ordering; adds a reorder buffer to UIOP.
 - Portable Interceptors (§10) — recommended against, not just deferred;
@@ -159,7 +163,8 @@ is built, since that's what motivates them, not Phase 2 itself.
 ## Summary
 
 Almost everything missing is missing simply because it hasn't been
-built yet (Phase 3 of the existing roadmap), not because UDP makes it
+built yet (Phase 4+ of the existing roadmap — `idlc`, examples,
+platform hardening, certification artifacts), not because UDP makes it
 impossible. The only spec-level casualties of choosing UDP are:
 **GIOP CloseConnection** (no connection to close) and **RT-CORBA
 priority-banded/private connections** (no connections to band) — both

@@ -57,7 +57,7 @@ static void echo_server_task(void *arg)
 
     status = hace_uiop_receive(&transport, HACE_GIOP_MSG_REQUEST, NULL, 2000U, body,
                                 sizeof(body), &header, &request_id, NULL, &body_length,
-                                &src_addr, &src_port);
+                                &src_addr, &src_port, NULL);
     if (status != HACE_UIOP_OK) {
         ctx->server_saw_request = 0;
         return;
@@ -326,7 +326,7 @@ static void big_echo_server_task(void *arg)
     status = hace_uiop_receive(&transport, HACE_GIOP_MSG_REQUEST, NULL, 2000U,
                                 ctx->received_body, sizeof(ctx->received_body), &header,
                                 &request_id, NULL, &ctx->received_body_length, &src_addr,
-                                &src_port);
+                                &src_port, NULL);
     if (status != HACE_UIOP_OK) {
         ctx->server_saw_request = 0;
         return;
@@ -507,12 +507,60 @@ static int test_receive_discards_unrelated_traffic(void)
 
     status = hace_uiop_receive(&receiver_transport, HACE_GIOP_MSG_REPLY, &match_id, 1000U,
                                 body, sizeof(body), &out_header, &out_request_id,
-                                &out_reply_status, &out_body_length, NULL, NULL);
+                                &out_reply_status, &out_body_length, NULL, NULL, NULL);
 
     HACE_ASSERT_TRUE(status == HACE_UIOP_OK);
     HACE_ASSERT_EQ_INT(match_id, out_request_id);
     HACE_ASSERT_EQ_INT(4, out_body_length);
     HACE_ASSERT_TRUE(memcmp(body, "real", 4) == 0);
+
+    HACE_ASSERT_TRUE(hace_hal_socket_close(receiver_socket) == HACE_HAL_OK);
+    HACE_ASSERT_TRUE(hace_hal_socket_close(sender_socket) == HACE_HAL_OK);
+    return 1;
+}
+
+static int test_receive_reports_request_info(void)
+{
+    hace_hal_socket_handle_t receiver_socket = HACE_HAL_INVALID_SOCKET;
+    hace_hal_socket_handle_t sender_socket = HACE_HAL_INVALID_SOCKET;
+    hace_uiop_transport_t receiver_transport;
+    hace_uiop_transport_t sender_transport;
+    uint8_t request_storage[256];
+    hace_cdr_buffer_t request_buf;
+    uint8_t body[256];
+    hace_giop_message_header_t out_header;
+    uint32_t out_request_id = 0U;
+    size_t out_body_length = 0U;
+    hace_uiop_request_info_t request_info;
+    hace_uiop_status_t status;
+
+    memset(&request_info, 0, sizeof(request_info));
+
+    HACE_ASSERT_TRUE(hace_hal_socket_open(&receiver_socket, 58571U) == HACE_HAL_OK);
+    HACE_ASSERT_TRUE(hace_hal_socket_open(&sender_socket, 58572U) == HACE_HAL_OK);
+    receiver_transport = hace_uiop_transport_for_socket(&receiver_socket);
+    sender_transport = hace_uiop_transport_for_socket(&sender_socket);
+
+    HACE_ASSERT_TRUE(hace_cdr_buffer_init(&request_buf, request_storage,
+                                           sizeof(request_storage),
+                                           HACE_CDR_BIG_ENDIAN) == HACE_CDR_OK);
+    HACE_ASSERT_TRUE(build_request(&request_buf, 7U, "do_thing", NULL, 0U));
+    HACE_ASSERT_TRUE(hace_uiop_send_message(&sender_transport, &request_buf,
+                                             HACE_GIOP_MSG_REQUEST, 7U, LOOPBACK_ADDR,
+                                             58571U,
+                                             HACE_UIOP_MAX_DATAGRAM_SIZE) == HACE_UIOP_OK);
+
+    status = hace_uiop_receive(&receiver_transport, HACE_GIOP_MSG_REQUEST, NULL, 1000U,
+                                body, sizeof(body), &out_header, &out_request_id, NULL,
+                                &out_body_length, NULL, NULL, &request_info);
+
+    HACE_ASSERT_TRUE(status == HACE_UIOP_OK);
+    HACE_ASSERT_EQ_INT(7, out_request_id);
+    /* build_request always sets a 1-byte object key {0x01}. */
+    HACE_ASSERT_EQ_INT(1, request_info.object_key_length);
+    HACE_ASSERT_EQ_INT(0x01, request_info.object_key[0]);
+    HACE_ASSERT_TRUE(strcmp(request_info.operation, "do_thing") == 0);
+    HACE_ASSERT_EQ_INT(1, request_info.response_expected);
 
     HACE_ASSERT_TRUE(hace_hal_socket_close(receiver_socket) == HACE_HAL_OK);
     HACE_ASSERT_TRUE(hace_hal_socket_close(sender_socket) == HACE_HAL_OK);
@@ -528,5 +576,6 @@ int main(void)
     HACE_RUN_TEST(test_fragmentation_roundtrip);
     HACE_RUN_TEST(test_send_rejects_message_needing_too_many_fragments);
     HACE_RUN_TEST(test_receive_discards_unrelated_traffic);
+    HACE_RUN_TEST(test_receive_reports_request_info);
     HACE_TEST_REPORT();
 }

@@ -83,6 +83,17 @@ typedef struct {
     void *context;
 } hace_uiop_transport_t;
 
+/* The Request-specific fields hace_uiop_receive can report back (see
+ * its out_request_info parameter below) -- the object key and
+ * operation a POA-style dispatcher needs to route a call, which
+ * request_id alone doesn't carry. */
+typedef struct {
+    uint8_t object_key[HACE_GIOP_MAX_OBJECT_KEY];
+    size_t object_key_length;
+    char operation[HACE_GIOP_MAX_OPERATION_NAME];
+    int response_expected;
+} hace_uiop_request_info_t;
+
 /* Builds the production transport: send/recv forward to
  * hace_hal_socket_send/hace_hal_socket_recv on *handle. handle must
  * stay valid (and its socket open) for as long as the returned
@@ -134,9 +145,12 @@ hace_uiop_status_t hace_uiop_send_message(const hace_uiop_transport_t *transport
  * out_src_addr_ipv4/out_src_port (pass NULL for either if not
  * needed) report the first chunk's sender address -- how a server finds
  * out where to send its reply, since UDP carries no persistent
- * connection to answer back on. Reassembly exceeding
- * HACE_UIOP_MAX_FRAGMENTS datagrams or body_capacity returns
- * HACE_UIOP_ERR_TOO_LARGE. */
+ * connection to answer back on. out_request_info (pass NULL if not
+ * needed) is populated only when expected_type is HACE_GIOP_MSG_REQUEST,
+ * with the object key/operation/response_expected a POA-style
+ * dispatcher needs to route the call -- request_id alone isn't enough
+ * for that. Reassembly exceeding HACE_UIOP_MAX_FRAGMENTS datagrams or
+ * body_capacity returns HACE_UIOP_ERR_TOO_LARGE. */
 hace_uiop_status_t hace_uiop_receive(const hace_uiop_transport_t *transport,
                                       hace_giop_message_type_t expected_type,
                                       const uint32_t *match_request_id,
@@ -148,7 +162,8 @@ hace_uiop_status_t hace_uiop_receive(const hace_uiop_transport_t *transport,
                                       hace_giop_reply_status_t *out_reply_status,
                                       size_t *out_body_length,
                                       uint32_t *out_src_addr_ipv4,
-                                      uint16_t *out_src_port);
+                                      uint16_t *out_src_port,
+                                      hace_uiop_request_info_t *out_request_info);
 
 /* The twoway client primitive: sends request (a fully encoded
  * HACE_GIOP_MSG_REQUEST message, built the same way as for
