@@ -1,5 +1,4 @@
 with Ada.Streams; use Ada.Streams;
-with Interfaces.C;
 with System;
 
 package body Hace.Hal is
@@ -89,6 +88,11 @@ package body Hace.Hal is
       Result := To_Status (C_Socket_Close (Interfaces.C.int (Handle)));
       Handle := Invalid_Socket;
    end Close;
+
+   function To_Raw (Handle : Socket_Handle) return Interfaces.C.int is
+   begin
+      return Interfaces.C.int (Handle);
+   end To_Raw;
 
    procedure Send
      (Handle    : Socket_Handle;

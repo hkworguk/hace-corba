@@ -477,8 +477,17 @@ static int test_poa_concurrent_dispatch(void)
     return 1;
 }
 
+static int test_poa_sizeof_matches_struct(void)
+{
+    /* Guards the Ada95/Rust bindings' opaque-blob sizing: their
+     * compile-time storage must stay >= this at runtime. */
+    HACE_ASSERT_EQ_INT(sizeof(hace_corba_poa_t), hace_corba_poa_sizeof());
+    return 1;
+}
+
 int main(void)
 {
+    HACE_RUN_TEST(test_poa_sizeof_matches_struct);
     HACE_RUN_TEST(test_poa_echo_roundtrip);
     HACE_RUN_TEST(test_poa_oneway_sends_no_reply);
     HACE_RUN_TEST(test_poa_unknown_object_key_raises_object_not_exist);

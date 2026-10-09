@@ -71,6 +71,14 @@ typedef struct {
     size_t count;
 } hace_corba_poa_t;
 
+/* Returns sizeof(hace_corba_poa_t). Non-C bindings (Ada95, Rust --
+ * see bindings/) that treat hace_corba_poa_t as opaque storage (it
+ * holds a function-pointer-bearing array that's fragile to mirror by
+ * hand) rather than mirroring its field layout use this to size that
+ * storage and runtime-verify it's large enough, the same way
+ * hace_cdr_buffer_sizeof() already supports hace_cdr_buffer_t. */
+size_t hace_corba_poa_sizeof(void);
+
 hace_corba_status_t hace_corba_poa_init(hace_corba_poa_t *poa);
 
 /* Registers servant/context under object_key. Must be called before

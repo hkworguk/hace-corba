@@ -20,6 +20,7 @@
 
 with Interfaces;
 with Interfaces.C;
+with System;
 
 package Hace.Cdr is
 
@@ -102,6 +103,51 @@ package Hace.Cdr is
      (Buf : in out Buffer; Value : Interfaces.C.double; Result : out Status);
    procedure Decode_F64
      (Buf : in out Buffer; Value : out Interfaces.C.double; Result : out Status);
+
+   --  Encodes/decodes a CDR string (a u32 length prefix including the
+   --  NUL, then that many bytes -- see cdr.h). Value's own length (not
+   --  a separate max_length) is what's passed to the C encoder, so
+   --  Value must already be sized to exactly what should be sent.
+   procedure Encode_String (Buf : in out Buffer; Value : String; Result : out Status);
+
+   --  Decodes into Value (out), which must be at least as long as the
+   --  wire string; Last is Value's first index + the decoded length -
+   --  1 (Value (Value'First .. Last) holds the decoded characters).
+   procedure Decode_String
+     (Buf : in out Buffer; Value : out String; Last : out Natural; Result : out Status);
+
+   --  Address-based twins of Encode_I32/Decode_I32/Encode_String/
+   --  Decode_String, for a servant procedure's Args/Reply parameters
+   --  (System.Address pointing at a hace_cdr_buffer_t that
+   --  hace_corba_poa.c already built and owns -- a servant must write
+   --  through that exact buffer, not a copy, so there's no Buffer
+   --  value to pass here the way ordinary client/server code above
+   --  does). See Hace.Corba_Poa.Servant_Procedure.
+   procedure Decode_I32_At
+     (Buf_Address : System.Address;
+      Value       : out Interfaces.Integer_32;
+      Result      : out Status);
+   procedure Encode_I32_At
+     (Buf_Address : System.Address;
+      Value       : Interfaces.Integer_32;
+      Result      : out Status);
+   procedure Decode_String_At
+     (Buf_Address : System.Address;
+      Value       : out String;
+      Last        : out Natural;
+      Result      : out Status);
+   procedure Encode_String_At
+     (Buf_Address : System.Address;
+      Value       : String;
+      Result      : out Status);
+
+   --  Exposes Buf's opaque storage address to this project's other
+   --  hace-corba binding packages (Hace.Giop, Hace.Uiop,
+   --  Hace.Corba_Ior) that pass a hace_cdr_buffer_t* straight through
+   --  to a C hace_giop_*/hace_uiop_*/hace_corba_ior_* call taking one.
+   --  Not for application code -- those packages' own Buffer-taking
+   --  subprograms are the intended interface.
+   function Raw_Address (Buf : in out Buffer) return System.Address;
 
 private
 

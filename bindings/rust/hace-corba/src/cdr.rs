@@ -4,7 +4,7 @@
 use crate::sys;
 use std::fmt;
 use std::marker::PhantomData;
-use std::os::raw::c_int;
+use std::os::raw::{c_char, c_int};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ByteOrder {
@@ -30,7 +30,7 @@ pub enum CdrError {
 }
 
 impl CdrError {
-    fn from_status(status: sys::hace_cdr_status_t) -> Result<(), CdrError> {
+    pub(crate) fn from_status(status: sys::hace_cdr_status_t) -> Result<(), CdrError> {
         match status {
             sys::HACE_CDR_OK => Ok(()),
             sys::HACE_CDR_ERR_BUFFER_OVERFLOW => Err(CdrError::BufferOverflow),
@@ -110,6 +110,18 @@ impl<'a> CdrBuffer<'a> {
 
     pub fn capacity(&self) -> usize {
         unsafe { sys::hace_cdr_buffer_capacity(&self.raw) }
+    }
+
+    /// Exposes the underlying opaque buffer pointer to other modules in
+    /// this crate (`giop`, `uiop`) that need to pass it straight through
+    /// to a `hace_giop_*`/`hace_uiop_*` C call taking a `hace_cdr_buffer_t *`
+    /// -- those functions operate on the same buffer `CdrBuffer` already
+    /// owns, not a separate one, so no new wrapper type is needed for
+    /// that case (contrast `CdrBufferView` in `uiop.rs`, which exists
+    /// because a servant callback's `args`/`reply` are buffers *C*
+    /// allocated, not ones this crate constructed).
+    pub(crate) fn as_raw_mut_ptr(&mut self) -> *mut sys::RawCdrBuffer {
+        &mut self.raw
     }
 
     /// Rewinds/seeks the cursor -- e.g. `set_position(0)` before decoding
@@ -197,6 +209,32 @@ impl<'a> CdrBuffer<'a> {
         sys::hace_cdr_encode_f64,
         sys::hace_cdr_decode_f64
     );
+
+    /// Decodes a CDR string up to `max_length` bytes (including the
+    /// NUL the wire format carries).
+    pub fn decode_string(&mut self, max_length: usize) -> Result<String, CdrError> {
+        let mut storage = vec![0u8; max_length];
+        let mut out_length: usize = 0;
+        let status = unsafe {
+            sys::hace_cdr_decode_string(
+                &mut self.raw,
+                storage.as_mut_ptr() as *mut c_char,
+                storage.len(),
+                &mut out_length,
+            )
+        };
+        CdrError::from_status(status)?;
+        storage.truncate(out_length);
+        Ok(String::from_utf8_lossy(&storage).into_owned())
+    }
+
+    pub fn encode_string(&mut self, value: &str) -> Result<(), CdrError> {
+        let c_string =
+            std::ffi::CString::new(value).map_err(|_| CdrError::InvalidArgument)?;
+        CdrError::from_status(unsafe {
+            sys::hace_cdr_encode_string(&mut self.raw, c_string.as_ptr(), value.len() + 1)
+        })
+    }
 }
 
 #[cfg(test)]

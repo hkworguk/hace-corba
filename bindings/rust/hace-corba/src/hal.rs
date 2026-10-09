@@ -78,6 +78,14 @@ impl UdpSocket {
         Ok(UdpSocket { handle })
     }
 
+    /// Exposes the underlying socket handle to `uiop::Transport::for_socket`,
+    /// which needs a stable pointer to it for the lifetime of the
+    /// transport (mirroring `hace_uiop_transport_for_socket`'s own
+    /// contract in C).
+    pub(crate) fn raw_handle_ptr(&self) -> *const sys::hace_hal_socket_handle_t {
+        &self.handle
+    }
+
     pub fn send(&self, data: &[u8], dest: Ipv4Addr, dest_port: u16) -> Result<(), HalError> {
         let status = unsafe {
             sys::hace_hal_socket_send(

@@ -1,5 +1,3 @@
-with System;
-
 package body Hace.Cdr is
 
    use type Interfaces.C.int;
@@ -111,6 +109,18 @@ package body Hace.Cdr is
    function C_Decode_F64
      (Buf : System.Address; Value : out Interfaces.C.double) return Interfaces.C.int;
    pragma Import (C, C_Decode_F64, "hace_cdr_decode_f64");
+
+   function C_Encode_String
+     (Buf : System.Address; Str : System.Address; Max_Length : Interfaces.C.size_t)
+      return Interfaces.C.int;
+   pragma Import (C, C_Encode_String, "hace_cdr_encode_string");
+
+   function C_Decode_String
+     (Buf          : System.Address;
+      Out_Str      : System.Address;
+      Out_Capacity : Interfaces.C.size_t;
+      Out_Length   : out Interfaces.C.size_t) return Interfaces.C.int;
+   pragma Import (C, C_Decode_String, "hace_cdr_decode_string");
 
    --  ---- helpers ----
 
@@ -304,5 +314,97 @@ package body Hace.Cdr is
    begin
       Result := To_Status (C_Decode_F64 (Buf.Raw'Address, Value));
    end Decode_F64;
+
+   procedure Encode_String (Buf : in out Buffer; Value : String; Result : out Status) is
+      C_Str : constant Interfaces.C.char_array := Interfaces.C.To_C (Value);
+   begin
+      Result :=
+        To_Status
+          (C_Encode_String (Buf.Raw'Address, C_Str (C_Str'First)'Address, C_Str'Length));
+   end Encode_String;
+
+   procedure Decode_String
+     (Buf : in out Buffer; Value : out String; Last : out Natural; Result : out Status)
+   is
+      C_Out   : Interfaces.C.char_array (0 .. Interfaces.C.size_t (Value'Length));
+      Out_Len : Interfaces.C.size_t;
+   begin
+      Result :=
+        To_Status
+          (C_Decode_String
+             (Buf.Raw'Address, C_Out (C_Out'First)'Address, C_Out'Length, Out_Len));
+      if Result = Ok then
+         declare
+            Decoded : constant String :=
+              Interfaces.C.To_Ada (C_Out, Trim_Nul => True);
+         begin
+            Last := Value'First + Decoded'Length - 1;
+            Value (Value'First .. Last) := Decoded;
+         end;
+      else
+         Last := Value'First - 1;
+      end if;
+   end Decode_String;
+
+   procedure Decode_I32_At
+     (Buf_Address : System.Address;
+      Value       : out Interfaces.Integer_32;
+      Result      : out Status)
+   is
+   begin
+      Result := To_Status (C_Decode_I32 (Buf_Address, Value));
+   end Decode_I32_At;
+
+   procedure Encode_I32_At
+     (Buf_Address : System.Address;
+      Value       : Interfaces.Integer_32;
+      Result      : out Status)
+   is
+   begin
+      Result := To_Status (C_Encode_I32 (Buf_Address, Value));
+   end Encode_I32_At;
+
+   procedure Decode_String_At
+     (Buf_Address : System.Address;
+      Value       : out String;
+      Last        : out Natural;
+      Result      : out Status)
+   is
+      C_Out   : Interfaces.C.char_array (0 .. Interfaces.C.size_t (Value'Length));
+      Out_Len : Interfaces.C.size_t;
+   begin
+      Result :=
+        To_Status
+          (C_Decode_String
+             (Buf_Address, C_Out (C_Out'First)'Address, C_Out'Length, Out_Len));
+      if Result = Ok then
+         declare
+            Decoded : constant String :=
+              Interfaces.C.To_Ada (C_Out, Trim_Nul => True);
+         begin
+            Last := Value'First + Decoded'Length - 1;
+            Value (Value'First .. Last) := Decoded;
+         end;
+      else
+         Last := Value'First - 1;
+      end if;
+   end Decode_String_At;
+
+   procedure Encode_String_At
+     (Buf_Address : System.Address;
+      Value       : String;
+      Result      : out Status)
+   is
+      C_Str : constant Interfaces.C.char_array := Interfaces.C.To_C (Value);
+   begin
+      Result :=
+        To_Status
+          (C_Encode_String (Buf_Address, C_Str (C_Str'First)'Address, C_Str'Length));
+   end Encode_String_At;
+
+   function Raw_Address (Buf : in out Buffer) return System.Address is
+   begin
+      return Buf.Raw'Address;
+   end Raw_Address;
 
 end Hace.Cdr;

@@ -35,6 +35,11 @@ fn main() {
 
     let sources = [
         runtime_root.join("src/cdr/cdr.c"),
+        runtime_root.join("src/giop/giop.c"),
+        runtime_root.join("src/uiop/uiop.c"),
+        runtime_root.join("src/corba/corba_exception.c"),
+        runtime_root.join("src/corba/corba_ior.c"),
+        runtime_root.join("src/corba/corba_poa.c"),
         runtime_root.join("src/hal/hal_pool.c"),
         runtime_root.join("src/hal/linux/hal_linux.c"),
     ];

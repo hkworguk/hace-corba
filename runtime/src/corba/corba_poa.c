@@ -2,6 +2,11 @@
 
 #include <string.h>
 
+size_t hace_corba_poa_sizeof(void)
+{
+    return sizeof(hace_corba_poa_t);
+}
+
 hace_corba_status_t hace_corba_poa_init(hace_corba_poa_t *poa)
 {
     size_t i;

@@ -7,6 +7,7 @@
 
 with Ada.Streams;
 with Interfaces;
+with Interfaces.C;
 
 package Hace.Hal is
 
@@ -44,6 +45,14 @@ package Hace.Hal is
       Result     : out Status);
 
    procedure Close (Handle : in out Socket_Handle; Result : out Status);
+
+   --  Exposes Handle's underlying C int value to Hace.Uiop.For_Socket,
+   --  which copies it into its own Transport record and passes that
+   --  copy's address to hace_uiop_transport_for_socket (the production
+   --  transport dereferences its context pointer on every send/recv,
+   --  so it must point at storage that outlives the call -- the
+   --  Transport object itself, not a transient copy of Handle).
+   function To_Raw (Handle : Socket_Handle) return Interfaces.C.int;
 
    procedure Send
      (Handle    : Socket_Handle;
