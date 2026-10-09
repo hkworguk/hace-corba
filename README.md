@@ -7,18 +7,19 @@ Assurance Level C (DAL C) certification.
 ## Status
 
 Early scaffold. See `docs/roadmap.md` for the full phased plan. Phase 0
-through Phase 3 are done: CDR + GIOP message framing, the UIOP UDP
+through Phase 5 are done: CDR + GIOP message framing, the UIOP UDP
 transport (send/receive over real sockets, bounded retry/timeout, real
-fragmentation), and a minimal ORB core — exceptions, object references
-(IOR), and a POA that activates objects and dispatches Requests to them
-across a bounded, concurrent worker-task pool (see
-`runtime/tests/test_corba_poa.c`). What's still missing is `idlc`
-actually generating code (Phase 4) and the RPC/oneway/async/observer
-*examples* (Phase 5) — the POA/dispatch mechanism they'll use is built,
-hand-written servants and all. Ada95 and Rust bindings exist for the
-CDR + HAL core (not yet extended to GIOP/UIOP/the new CORBA modules),
-with examples that round-trip a CDR-encoded message over a raw UDP
-socket — see `bindings/` and `examples/`. See
+fragmentation), a minimal ORB core (exceptions, object references, a
+POA dispatching Requests to activated servants across a bounded,
+concurrent worker-task pool), and four real client/server example pairs
+in `examples/c/` — `rpc_basic`, `oneway`, `async_ami`, `observer_attach`
+— each two separate executables actually talking CORBA over UDP (see
+`examples/c/README.md`). What's still missing is `idlc` actually
+generating code from IDL (Phase 4) — every example's servants/stubs are
+hand-written against the runtime directly. Ada95 and Rust bindings
+exist for the CDR + HAL core only (not yet extended to GIOP/UIOP/the
+CORBA modules), with their own simpler CDR-round-trip examples — see
+`bindings/` and `examples/rust`/`examples/ada95`. See
 `docs/corba-spec-gap-analysis.md` for the full item-by-item check of
 this implementation against the OMG CORBA spec.
 
@@ -33,8 +34,8 @@ this implementation against the OMG CORBA spec.
   exceptions, object references, and a static POA dispatching Requests
   to activated servants across a bounded worker-task pool — all working
   over actual UDP sockets. What's still missing is `idlc` generating
-  code from IDL (Phase 4) and the example programs that use all this
-  (Phase 5).
+  code from IDL (Phase 4); every example in `examples/c/` hand-writes
+  its servants/stubs against the runtime directly instead.
 - Hand-written Ada95 and Rust bindings (`bindings/`) onto that runtime's
   CDR and HAL layers, for host tooling and non-safety-critical
   application code — not part of the DAL C certification boundary (see
@@ -70,9 +71,10 @@ idlc/        hace-idlc: the IDL compiler (Rust, host tool, not part of the
 runtime/     hace-corba-core: the certified ORB runtime (C99).
 bindings/    Hand-written Ada95 and Rust bindings onto the runtime's
              CDR/HAL layers (not part of the DAL C certification boundary).
-examples/    Example clients/servers, per language: Rust and Ada95 today
-             (CDR + UDP round-trip); RPC/oneway/async/observer wait on
-             the ORB core (Phase 2-3, see docs/roadmap.md).
+examples/    Example clients/servers. examples/c/: four real ORB-based
+             pairs (rpc_basic, oneway, async_ami, observer_attach), see
+             examples/c/README.md. examples/rust/, examples/ada95/:
+             simpler CDR+UDP round-trip examples for those bindings.
 cmake/       CMake toolchain files per target.
 ci/          Continuous integration configuration; ci/build_all.sh builds
              and tests every component in one pass.
@@ -84,10 +86,11 @@ ci/          Continuous integration configuration; ci/build_all.sh builds
 ci/build_all.sh
 ```
 
-Builds and tests the C runtime (CMake), the Rust bindings + idlc
-skeleton + Rust example (cargo), and the Ada95 bindings + example
-(gnatmake) in one pass. Requires cmake, a C compiler, cargo/rustc, and
-gnatmake.
+Builds and tests the C runtime plus the four `examples/c/` ORB-based
+example pairs (CMake — actually runs each pair, not just compiles it),
+the Rust bindings + idlc skeleton + Rust example (cargo), and the Ada95
+bindings + example (gnatmake), in one pass. Requires cmake, a C
+compiler, cargo/rustc, and gnatmake.
 
 ## Building the C runtime by itself
 
@@ -96,6 +99,9 @@ cmake -S . -B build -DCMAKE_TOOLCHAIN_FILE=cmake/ubuntu.cmake
 cmake --build build
 ctest --test-dir build
 ```
+
+This also builds the `examples/c/` pairs (disable with
+`-DHACE_BUILD_EXAMPLES=OFF`); see `examples/c/README.md` to run them.
 
 ## Building the IDL compiler
 

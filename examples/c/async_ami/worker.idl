@@ -1,0 +1,6 @@
+// Reference only -- not processed by any tool (no idlc yet, Phase 4).
+module HaceExamples {
+    interface Worker {
+        long compute(in long input);
+    };
+};

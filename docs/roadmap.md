@@ -120,23 +120,34 @@ Everything else below is planned, not yet built.
   (Result-based errors, opaque `RawCdrBuffer`) are a reasonable starting
   point for what generated code should produce.
 
-## Phase 5 — Examples
-- Done (CDR + HAL only, predating the ORB): `examples/rust/cdr_udp_echo`
-  and `examples/ada95/cdr_udp_echo` — encode with CDR, round-trip over a
-  raw UDP HAL socket, decode. Not RPC examples.
-- Now buildable (Phase 3's POA/dispatch landed): the real RPC-style
-  examples, written directly against `hace_corba_poa_t`/
-  `hace_corba_servant_fn_t`/`hace_uiop_call` (hand-written, since
-  `idlc` — Phase 4 — doesn't generate stubs/skeletons yet):
-  - `rpc_basic`: synchronous twoway call.
-  - `oneway`: fire-and-forget call.
-  - `async_ami`: Poller-style asynchronous invocation (send now,
-    poll/await reply later) — well suited to UDP's non-blocking send.
-  - `observer_attach`: Subject/Observer pattern over CORBA object
-    references — client exposes an Observer object, server's
-    Subject.attach() stores the reference and later invokes back via
-    Observer.update(), exercising bidirectional calls through the
-    minimal POA running in both processes.
+## Phase 5 — Examples (done)
+- Predating the ORB, CDR + HAL only: `examples/rust/cdr_udp_echo` and
+  `examples/ada95/cdr_udp_echo` — encode with CDR, round-trip over a
+  raw UDP HAL socket, decode. Not RPC examples; left as-is.
+- The real thing, in `examples/c/` — four client/server pairs (eight
+  executables), each hand-written directly against `hace_corba_poa_t`/
+  `hace_corba_servant_fn_t`/`hace_uiop_call`/`hace_corba_ior_t` (no
+  `idlc` yet — Phase 4 — to generate stubs/skeletons), each with a
+  reference-only `.idl` file stating the interface it implements. See
+  `examples/c/README.md`:
+  - `rpc_basic`: synchronous twoway call (`Calculator.add`).
+  - `oneway`: fire-and-forget calls (`Logger.log`), no wait, no reply.
+  - `async_ami`: Poller-style asynchronous invocation (send now, poll
+    `hace_uiop_receive` while doing other visible work, pick up the
+    reply later) — well suited to UDP's non-blocking send; the
+    server's simulated ~300ms of work gives the poll loop something
+    real to wait through.
+  - `observer_attach`: Subject/Observer over CORBA object references —
+    the observer runs its own POA, calls `Subject.attach(self_ior)` as
+    a twoway client call, then dispatches incoming oneway
+    `Observer.update()` callbacks on that same local POA; the subject
+    generates events on its own schedule and pushes them to every
+    attached observer. Genuinely bidirectional, no BiDirIIOP-style
+    negotiation needed (see `docs/architecture/adr-0002-giop-framing.md`/
+    `adr-0003-uiop-transport.md`).
+- `ci/build_all.sh` builds all four pairs and actually runs each one
+  (server backgrounded, client run against it, both checked) rather
+  than stopping at "it compiles."
 
 ## Phase 6 — Platform hardening
 - Ubuntu Linux HAL: harden for real network conditions (loss, reorder,
