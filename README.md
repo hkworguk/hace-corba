@@ -11,15 +11,16 @@ through Phase 5 are done: CDR + GIOP message framing, the UIOP UDP
 transport (send/receive over real sockets, bounded retry/timeout, real
 fragmentation), a minimal ORB core (exceptions, object references, a
 POA dispatching Requests to activated servants across a bounded,
-concurrent worker-task pool), and four real client/server example pairs
-in `examples/c/` — `rpc_basic`, `oneway`, `async_ami`, `observer_attach`
-— each two separate executables actually talking CORBA over UDP (see
-`examples/c/README.md`). What's still missing is `idlc` actually
-generating code from IDL (Phase 4) — every example's servants/stubs are
-hand-written against the runtime directly. Ada95 and Rust bindings
-exist for the CDR + HAL core only (not yet extended to GIOP/UIOP/the
-CORBA modules), with their own simpler CDR-round-trip examples — see
-`bindings/` and `examples/rust`/`examples/ada95`. See
+concurrent worker-task pool), and four real client/server example
+pairs — `rpc_basic`, `oneway`, `async_ami`, `observer_attach` — each
+two separate executables actually talking CORBA over UDP, implemented
+three times over: once in C directly against the runtime, and once
+each against the Ada95 and Rust bindings (`bindings/`), which Phase 6
+extended from CDR + HAL to also cover GIOP/UIOP/the CORBA core, just
+enough for these four pairs (see `examples/README.md`). What's still
+missing is `idlc` actually generating code from IDL (Phase 4) — every
+example's servants/stubs, in all three languages, are hand-written
+instead, against a single shared `.idl` reference spec per pair. See
 `docs/corba-spec-gap-analysis.md` for the full item-by-item check of
 this implementation against the OMG CORBA spec.
 
@@ -34,14 +35,17 @@ this implementation against the OMG CORBA spec.
   exceptions, object references, and a static POA dispatching Requests
   to activated servants across a bounded worker-task pool — all working
   over actual UDP sockets. What's still missing is `idlc` generating
-  code from IDL (Phase 4); every example in `examples/c/` hand-writes
-  its servants/stubs against the runtime directly instead.
-- Hand-written Ada95 and Rust bindings (`bindings/`) onto that runtime's
-  CDR and HAL layers, for host tooling and non-safety-critical
-  application code — not part of the DAL C certification boundary (see
-  `docs/architecture/adr-0001-runtime-language.md`). The IDL-generated
-  bindings (Ada95, C, C++, Rust) are separate, later work — see `idlc/`
-  below.
+  code from IDL (Phase 4); every example hand-writes its servants/stubs
+  against the runtime (or a binding onto it) directly instead.
+- Hand-written Ada95 and Rust bindings (`bindings/`) onto that runtime,
+  for host tooling and non-safety-critical application code — not part
+  of the DAL C certification boundary (see
+  `docs/architecture/adr-0001-runtime-language.md`). Cover CDR and HAL
+  fully, plus just enough of GIOP/UIOP/the CORBA core to support the
+  four example pairs above (see
+  `docs/architecture/adr-0005-rust-ada-orb-bindings.md`). The
+  IDL-generated bindings (Ada95, C, C++, Rust) are separate, later
+  work — see `idlc/` below.
 - An IDL compiler (`idlc/`, Rust) that will generate Ada95, C, C++, and
   Rust bindings from OMG IDL (Phase 4, not built yet — currently a
   skeleton) — now that the ORB core it would target (Phase 3: POA,
@@ -69,12 +73,13 @@ docs/        Standards references, architecture decision records, DO-178C
 idlc/        hace-idlc: the IDL compiler (Rust, host tool, not part of the
              DAL C certification boundary).
 runtime/     hace-corba-core: the certified ORB runtime (C99).
-bindings/    Hand-written Ada95 and Rust bindings onto the runtime's
-             CDR/HAL layers (not part of the DAL C certification boundary).
-examples/    Example clients/servers. examples/c/: four real ORB-based
-             pairs (rpc_basic, oneway, async_ami, observer_attach), see
-             examples/c/README.md. examples/rust/, examples/ada95/:
-             simpler CDR+UDP round-trip examples for those bindings.
+bindings/    Hand-written Ada95 and Rust bindings onto the runtime
+             (not part of the DAL C certification boundary).
+examples/    Example clients/servers, grouped by example type first and
+             language second (examples/<name>/c|rust|ada95/), each of
+             the four ORB-based pairs sharing one examples/<name>/
+             <name>.idl spec across all three languages -- see
+             examples/README.md.
 cmake/       CMake toolchain files per target.
 ci/          Continuous integration configuration; ci/build_all.sh builds
              and tests every component in one pass.
@@ -86,10 +91,11 @@ ci/          Continuous integration configuration; ci/build_all.sh builds
 ci/build_all.sh
 ```
 
-Builds and tests the C runtime plus the four `examples/c/` ORB-based
-example pairs (CMake — actually runs each pair, not just compiles it),
-the Rust bindings + idlc skeleton + Rust example (cargo), and the Ada95
-bindings + example (gnatmake), in one pass. Requires cmake, a C
+Builds and tests the C runtime (CMake), the Rust bindings + idlc
+skeleton (cargo), the Ada95 bindings (gnatmake), and then every one of
+the four ORB-based example pairs in all three languages — actually
+runs each pair, not just compiles it, via that pair's own
+`examples/<name>/<lang>/build.sh`/`run.sh`. Requires cmake, a C
 compiler, cargo/rustc, and gnatmake.
 
 ## Building the C runtime by itself
@@ -100,8 +106,8 @@ cmake --build build
 ctest --test-dir build
 ```
 
-This also builds the `examples/c/` pairs (disable with
-`-DHACE_BUILD_EXAMPLES=OFF`); see `examples/c/README.md` to run them.
+This also builds the C side of the four example pairs (disable with
+`-DHACE_BUILD_EXAMPLES=OFF`); see `examples/README.md` to run them.
 
 ## Building the IDL compiler
 
@@ -115,7 +121,7 @@ cargo test
 
 ```sh
 cd bindings/rust/hace-corba && cargo build && cargo test
-cd ../../../examples/rust/cdr_udp_echo && cargo run
+cd ../../../examples/cdr_udp_echo/rust && cargo run
 ```
 
 ## Building the Ada95 bindings, tests, and example

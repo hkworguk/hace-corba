@@ -1,0 +1,12 @@
+// Reference only -- not processed by any tool (no idlc yet, Phase 4).
+// States what this example's client calls -- as opposed to
+// async_ami.idl itself, which is just the interface, and server.idl,
+// which states what the server implements.
+#include "async_ami.idl"
+
+// The async_ami client calls HaceExamples::Worker::compute(6) on the
+// server's "work" object, but not via a blocking twoway call: it
+// sends the Request directly, does other visible work, and polls for
+// the Reply on a short timeout in a loop -- the Poller-style
+// asynchronous invocation pattern (AMI). Implemented identically by
+// c/client.c, rust/src/client.rs, and ada95/client.adb.

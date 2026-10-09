@@ -1,8 +1,0 @@
-// Reference only -- not processed by any tool. hace-idlc (Phase 4,
-// see docs/roadmap.md) doesn't exist yet; server.c/client.c hand-
-// implement this interface directly against the runtime instead.
-module HaceExamples {
-    interface Calculator {
-        long add(in long a, in long b);
-    };
-};

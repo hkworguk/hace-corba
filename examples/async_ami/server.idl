@@ -1,0 +1,13 @@
+// Reference only -- not processed by any tool (no idlc yet, Phase 4).
+// States which interface(s) this example's server implements and
+// activates -- as opposed to async_ami.idl itself, which is just the
+// interface, and client.idl, which states what the client calls.
+#include "async_ami.idl"
+
+// The async_ami server activates one HaceExamples::Worker object,
+// under object key "work", on UDP port 59121. compute(input) is
+// dispatched as an ordinary twoway call, but takes ~300ms of
+// simulated work before replying -- deliberately slow, so
+// client.idl's Poller-style invocation has something real to
+// demonstrate. Implemented identically by c/server.c,
+// rust/src/server.rs, and ada95/{worker_impl,server}.adb.

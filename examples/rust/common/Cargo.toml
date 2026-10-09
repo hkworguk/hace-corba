@@ -1,8 +1,0 @@
-[package]
-name = "hace-corba-examples-common"
-version = "0.1.0"
-edition = "2021"
-description = "Shared helpers for the examples/rust/* ORB-based client/server pairs, mirroring examples/c/common/example_common.h."
-
-[dependencies]
-hace-corba = { path = "../../../bindings/rust/hace-corba" }

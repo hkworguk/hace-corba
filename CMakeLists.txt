@@ -9,5 +9,5 @@ enable_testing()
 add_subdirectory(runtime)
 
 if(HACE_BUILD_EXAMPLES)
-    add_subdirectory(examples/c)
+    add_subdirectory(examples)
 endif()

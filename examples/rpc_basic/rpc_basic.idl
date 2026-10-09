@@ -1,0 +1,9 @@
+// Reference only -- not processed by any tool. hace-idlc (Phase 4,
+// see docs/roadmap.md) doesn't exist yet; each of c/, rust/, and
+// ada95/ hand-implements this interface directly against its own
+// language binding instead, all three against this one spec.
+module HaceExamples {
+    interface Calculator {
+        long add(in long a, in long b);
+    };
+};

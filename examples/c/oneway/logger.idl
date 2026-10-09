@@ -1,6 +1,0 @@
-// Reference only -- not processed by any tool (no idlc yet, Phase 4).
-module HaceExamples {
-    interface Logger {
-        oneway void log(in string message);
-    };
-};

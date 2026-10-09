@@ -1,0 +1,8 @@
+// Reference only -- not processed by any tool (no idlc yet, Phase 4).
+// Hand-implemented identically by c/, rust/, and ada95/, all three
+// against this one spec.
+module HaceExamples {
+    interface Worker {
+        long compute(in long input);
+    };
+};

@@ -1,0 +1,10 @@
+// Reference only -- not processed by any tool (no idlc yet, Phase 4).
+// States what this example's client calls -- as opposed to
+// rpc_basic.idl itself, which is just the interface, and server.idl,
+// which states what the server implements.
+#include "rpc_basic.idl"
+
+// The rpc_basic client calls HaceExamples::Calculator::add(7, 35) on
+// the server's "calc" object as a single blocking twoway call, then
+// prints the result (42). Implemented identically by c/client.c,
+// rust/src/client.rs, and ada95/client.adb.

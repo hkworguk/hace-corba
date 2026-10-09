@@ -8,7 +8,7 @@ boundary** — see `../../../docs/architecture/adr-0001-runtime-language.md`.
 There is no ORB/POA/GIOP layer in the runtime yet (see
 `../../../docs/roadmap.md`), so these bindings cannot make CORBA-style
 RPC, oneway, async, or observer/attach calls. See
-`../../../examples/ada95/cdr_udp_echo` for what's demonstrable today, and
+`../../../examples/cdr_udp_echo/ada95` for what's demonstrable today, and
 `../tests/test_hace_corba.adb` for the binding's own unit test suite.
 
 ## Design notes
@@ -45,6 +45,6 @@ gnatmake -I. your_program.adb -o your_program \
 ```
 
 See `../tests/test_hace_corba.adb` and
-`../../../examples/ada95/cdr_udp_echo/main.adb` for complete examples, or
+`../../../examples/cdr_udp_echo/ada95/main.adb` for complete examples, or
 `../../../ci/build_all.sh` for the exact commands used to build and run
 everything in this repository.

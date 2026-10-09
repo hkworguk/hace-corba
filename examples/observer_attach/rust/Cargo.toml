@@ -1,0 +1,16 @@
+[package]
+name = "observer_attach"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "observer_attach_subject_server"
+path = "src/subject_server.rs"
+
+[[bin]]
+name = "observer_attach_observer_client"
+path = "src/observer_client.rs"
+
+[dependencies]
+hace-corba = { path = "../../../bindings/rust/hace-corba" }
+hace-corba-examples-common = { path = "../../common/rust" }

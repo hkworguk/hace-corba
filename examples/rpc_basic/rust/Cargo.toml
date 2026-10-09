@@ -1,0 +1,16 @@
+[package]
+name = "rpc_basic"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "rpc_basic_server"
+path = "src/server.rs"
+
+[[bin]]
+name = "rpc_basic_client"
+path = "src/client.rs"
+
+[dependencies]
+hace-corba = { path = "../../../bindings/rust/hace-corba" }
+hace-corba-examples-common = { path = "../../common/rust" }

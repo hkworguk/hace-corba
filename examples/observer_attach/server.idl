@@ -1,0 +1,21 @@
+// Reference only -- not processed by any tool (no idlc yet, Phase 4).
+// observer_attach is bidirectional, so unlike the other three
+// examples' server.idl (which only ever implements an interface),
+// this one both implements and calls: the subject implements Subject
+// (what the observer calls) but is itself a client of Observer
+// (what it calls back on every attached observer).
+#include "observer_attach.idl"
+
+// Implements: one HaceExamples::Subject object, under object key
+// "subj", on UDP port 59131. attach(obs) is a twoway call that
+// registers the caller-supplied HaceExamples::Observer reference.
+//
+// Calls: HaceExamples::Observer::update(event) as a oneway call,
+// once per attached observer, every ~1s of wall-clock time -- the
+// subject acting as a client on the very same socket it serves
+// attach() on, no BiDirIIOP-style negotiation needed (see
+// docs/architecture/adr-0002-giop-framing.md/adr-0003-uiop-transport.md).
+//
+// Implemented identically by c/subject_server.c,
+// rust/src/subject_server.rs, and
+// ada95/{subject_impl,subject_server}.adb.

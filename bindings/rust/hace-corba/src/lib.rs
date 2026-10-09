@@ -7,9 +7,9 @@
 //!
 //! CDR, HAL, GIOP (just enough to build a request), UIOP, and the
 //! CORBA core (exceptions, object references, a minimal POA) are
-//! bound -- enough for the four `examples/rust/` ORB-based pairs
+//! bound -- enough for the four `examples/*/rust` ORB-based pairs
 //! (`rpc_basic`, `oneway`, `async_ami`, `observer_attach`), matching
-//! `examples/c/`. Not the full C API surface of each module -- see
+//! `examples/*/c`. Not the full C API surface of each module -- see
 //! `docs/architecture/adr-0005-rust-ada-orb-bindings.md` for exactly
 //! what's bound and why, and what's deliberately left for later.
 

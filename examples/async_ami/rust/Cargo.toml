@@ -1,0 +1,16 @@
+[package]
+name = "async_ami"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "async_ami_server"
+path = "src/server.rs"
+
+[[bin]]
+name = "async_ami_client"
+path = "src/client.rs"
+
+[dependencies]
+hace-corba = { path = "../../../bindings/rust/hace-corba" }
+hace-corba-examples-common = { path = "../../common/rust" }

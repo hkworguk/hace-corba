@@ -1,0 +1,11 @@
+// Reference only -- not processed by any tool (no idlc yet, Phase 4).
+// States which interface(s) this example's server implements and
+// activates -- as opposed to rpc_basic.idl itself, which is just the
+// interface, and client.idl, which states what the client calls.
+#include "rpc_basic.idl"
+
+// The rpc_basic server activates one HaceExamples::Calculator object,
+// under object key "calc", on UDP port 59101. add(a, b) is dispatched
+// as an ordinary twoway call (response_expected = true): the caller
+// blocks for the reply. Implemented identically by c/server.c,
+// rust/src/server.rs, and ada95/{calculator_impl,server}.adb.

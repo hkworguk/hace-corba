@@ -9,7 +9,7 @@ certification boundary** — see
 There is no ORB/POA/GIOP layer in the runtime yet (see
 `../../../docs/roadmap.md`), so this crate cannot make CORBA-style RPC,
 oneway, async, or observer/attach calls. See
-`../../../examples/rust/cdr_udp_echo` for what's demonstrable today.
+`../../../examples/cdr_udp_echo/rust` for what's demonstrable today.
 
 ## How it's wired to the C runtime
 

@@ -1,0 +1,11 @@
+// Reference only -- not processed by any tool (no idlc yet, Phase 4).
+// States which interface(s) this example's server implements and
+// activates -- as opposed to oneway.idl itself, which is just the
+// interface, and client.idl, which states what the client calls.
+#include "oneway.idl"
+
+// The oneway server activates one HaceExamples::Logger object, under
+// object key "log", on UDP port 59111. log(message) is dispatched as
+// a genuine oneway call (response_expected = false): no Reply is ever
+// sent. Implemented identically by c/server.c, rust/src/server.rs,
+// and ada95/{logger_impl,server}.adb.
